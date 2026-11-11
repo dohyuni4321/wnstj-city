@@ -45,8 +45,8 @@ wss.on('connection', ws => {
         id: playerId,
         name: String(msg.name || '플레이어').slice(0, 12),
         color: colors[room.players.size % colors.length],
-        x: 0,
-        y: 0,
+        x: 450,
+        y: 280,
         a: 0,
         onFoot: true,
         lastMove: Date.now()

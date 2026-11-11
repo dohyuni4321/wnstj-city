@@ -6,7 +6,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let channel = null;
 let ws = null;
-let me = { id: null, name: "", x: 450, y: 280, a: 0, color: "#4da6ff", ready: false };
+let me = { id: crypto.randomUUID(), serverId: null, name: "", x: 450, y: 280, a: 0, color: "#4da6ff", ready: false };
 const others = new Map();
 const keys = {};
 let lastSend = 0;
@@ -39,7 +39,7 @@ function joinGame() {
 
 function connectSupabase(room) {
   channel = supabase.channel("room:" + room, {
-    config: { presence: { key: crypto.randomUUID() } }
+    config: { presence: { key: me.id } }
   });
 
   channel
@@ -58,7 +58,7 @@ function connectSupabase(room) {
       updatePlayerList();
     })
     .on("broadcast", { event: "chat" }, ({ payload }) => {
-      console.log(`${payload.name}: ${payload.text}`);
+      console.log(payload.name + ": " + payload.text);
     })
     .on("broadcast", { event: "ready" }, ({ payload }) => {
       const p = others.get(payload.id);
@@ -67,8 +67,6 @@ function connectSupabase(room) {
     })
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
-        me.id = crypto.randomUUID();
-
         channel.track({
           clientId: me.id,
           name: me.name,
@@ -112,14 +110,21 @@ function connectServer(room) {
 
       for (const p of msg.players) {
         if (p.id === me.serverId) continue;
-        others.set(p.id, p);
+
+        const old = others.get(p.id) || {};
+        others.set(p.id, {
+          ...old,
+          ...p,
+          tx: p.x,
+          ty: p.y
+        });
       }
 
       updatePlayerList();
     }
 
     if (msg.t === "chat") {
-      console.log(`${msg.name}: ${msg.text}`);
+      console.log(msg.name + ": " + msg.text);
     }
 
     if (msg.t === "system") {
@@ -208,6 +213,12 @@ function update(dt) {
   me.x = Math.max(20, Math.min(canvas.width - 20, me.x));
   me.y = Math.max(20, Math.min(canvas.height - 20, me.y));
 
+  for (const p of others.values()) {
+    if (p.tx === undefined) continue;
+    p.x += (p.tx - p.x) * Math.min(1, dt * 12);
+    p.y += (p.ty - p.y) * Math.min(1, dt * 12);
+  }
+
   if (ws && ws.readyState === 1 && Date.now() - lastSend > 200) {
     lastSend = Date.now();
 
@@ -261,3 +272,5 @@ function loop(now) {
   draw();
   requestAnimationFrame(loop);
 }
+
+requestAnimationFrame(loop);
