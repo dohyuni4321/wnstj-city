@@ -1,9 +1,11 @@
 const SUPABASE_URL = "https://eyiweluikqptpltdbind.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2HSCefmudZ2dM39UsDhbjQ_xUdBlTHy";
+const RENDER_SERVER_URL = "wss://wnstj-city-server.onrender.com";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let channel = null;
+let ws = null;
 let me = { id: null, name: "", x: 450, y: 280, a: 0, color: "#4da6ff", ready: false };
 const others = new Map();
 const keys = {};
@@ -31,6 +33,11 @@ function joinGame() {
   me.name = name;
   me.color = "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
 
+  connectSupabase(room);
+  connectServer(room);
+}
+
+function connectSupabase(room) {
   channel = supabase.channel("room:" + room, {
     config: { presence: { key: crypto.randomUUID() } }
   });
@@ -38,19 +45,17 @@ function joinGame() {
   channel
     .on("presence", { event: "sync" }, () => {
       const state = channel.presenceState();
-      others.clear();
 
       for (const id in state) {
         const p = state[id][0];
         if (!p || p.clientId === me.id) continue;
-        others.set(id, p);
+
+        if (!others.has(p.clientId)) {
+          others.set(p.clientId, { ...p, x: p.x || 450, y: p.y || 280 });
+        }
       }
 
       updatePlayerList();
-    })
-    .on("broadcast", { event: "move" }, ({ payload }) => {
-      if (payload.id === me.id) return;
-      others.set(payload.id, { ...(others.get(payload.id) || {}), ...payload });
     })
     .on("broadcast", { event: "chat" }, ({ payload }) => {
       console.log(`${payload.name}: ${payload.text}`);
@@ -77,18 +82,61 @@ function joinGame() {
         document.getElementById("game").style.display = "block";
         document.getElementById("chat").style.display = "flex";
         document.getElementById("roomLabel").innerText = room;
-        document.getElementById("status").innerText = "연결됨";
+        document.getElementById("status").innerText = "Supabase 연결됨 · 서버 연결 중...";
       }
     });
+}
 
-  requestAnimationFrame(loop);
+function connectServer(room) {
+  ws = new WebSocket(RENDER_SERVER_URL);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      t: "join",
+      name: me.name,
+      room
+    }));
+  };
+
+  ws.onmessage = event => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.t === "welcome") {
+      me.serverId = msg.id;
+      me.color = msg.color;
+      document.getElementById("status").innerText = "멀티플레이 연결됨";
+    }
+
+    if (msg.t === "state") {
+      others.clear();
+
+      for (const p of msg.players) {
+        if (p.id === me.serverId) continue;
+        others.set(p.id, p);
+      }
+
+      updatePlayerList();
+    }
+
+    if (msg.t === "chat") {
+      console.log(`${msg.name}: ${msg.text}`);
+    }
+
+    if (msg.t === "system") {
+      console.log(msg.text);
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById("status").innerText = "서버 연결 끊김";
+  };
 }
 
 function updatePlayerList() {
   const box = document.getElementById("players");
   box.innerHTML = "";
 
-  const all = [{ ...me, clientId: me.id }, ...others.values()];
+  const all = [{ ...me, id: me.serverId || me.id }, ...others.values()];
 
   for (const p of all) {
     const span = document.createElement("span");
@@ -101,20 +149,22 @@ function updatePlayerList() {
 function toggleReady() {
   me.ready = !me.ready;
 
-  channel.send({
-    type: "broadcast",
-    event: "ready",
-    payload: { id: me.id, ready: me.ready }
-  });
+  if (channel) {
+    channel.send({
+      type: "broadcast",
+      event: "ready",
+      payload: { id: me.id, ready: me.ready }
+    });
 
-  channel.track({
-    clientId: me.id,
-    name: me.name,
-    color: me.color,
-    x: me.x,
-    y: me.y,
-    ready: me.ready
-  });
+    channel.track({
+      clientId: me.id,
+      name: me.name,
+      color: me.color,
+      x: me.x,
+      y: me.y,
+      ready: me.ready
+    });
+  }
 
   updatePlayerList();
 }
@@ -123,13 +173,19 @@ function sendChat() {
   const input = document.getElementById("chatInput");
   const text = input.value.trim();
 
-  if (!text || !channel) return;
+  if (!text) return;
 
-  channel.send({
-    type: "broadcast",
-    event: "chat",
-    payload: { id: me.id, name: me.name, text }
-  });
+  if (channel) {
+    channel.send({
+      type: "broadcast",
+      event: "chat",
+      payload: { id: me.id, name: me.name, text }
+    });
+  }
+
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ t: "chat", text }));
+  }
 
   input.value = "";
 }
@@ -152,22 +208,16 @@ function update(dt) {
   me.x = Math.max(20, Math.min(canvas.width - 20, me.x));
   me.y = Math.max(20, Math.min(canvas.height - 20, me.y));
 
-  if (channel && Date.now() - lastSend > 200) {
+  if (ws && ws.readyState === 1 && Date.now() - lastSend > 200) {
     lastSend = Date.now();
 
-    channel.send({
-      type: "broadcast",
-      event: "move",
-      payload: {
-        id: me.id,
-        name: me.name,
-        color: me.color,
-        x: me.x,
-        y: me.y,
-        a: me.a,
-        ready: me.ready
-      }
-    });
+    ws.send(JSON.stringify({
+      t: "move",
+      x: me.x,
+      y: me.y,
+      a: me.a,
+      onFoot: true
+    }));
   }
 }
 
