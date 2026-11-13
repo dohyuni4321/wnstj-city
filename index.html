@@ -1062,12 +1062,13 @@
     for (const l of lots) {
       const d = Math.hypot(l.cx - tg.x, l.cz - tg.y);
       if (d < 650 && !l.cars) {
-        l.cars = []; l.slots.forEach((s, n) => {
+        l.cars = []; const __lr = Math.random; { let t = 777 + lots.indexOf(l) * 7919; Math.random = () => { t |= 0; t = t + 0x6D2B79F5 | 0; let r = Math.imul(t ^ t >>> 15, 1 | t); r = r + Math.imul(r ^ r >>> 7, 61 | r) ^ r; return ((r ^ r >>> 14) >>> 0) / 4294967296; }; }
+        l.slots.forEach((s, n) => {
           if (Math.random() < 0.75) {
             const c = n % 7 === 0 ? mkSp('sport', s[0], s[1], Math.PI / 2) : mkCar(s[0], s[1], Math.PI / 2 * (s[1] > l.cz ? -1 : 1), `hsl(${rnd(0, 360) | 0},60%,50%)`, 'k');
-            l.cars.push(c); cars.push(c);
+            c.nid = 100000 + lots.indexOf(l) * 100 + n; c._ox = c.x; c._oy = c.y; l.cars.push(c); cars.push(c);
           }
-        });
+        }); Math.random = __lr;
       } else if (d > 900 && l.cars) {
         for (const c of l.cars) if (c.type === 'k' && c !== P.car) { const i = cars.indexOf(c); if (i >= 0) cars.splice(i, 1); }
         l.cars = null;
@@ -2053,7 +2054,7 @@
       mk.position.set(x, 3, fz + 9); sc.add(mk); robs.push({ k: 'a', x, y: fz + 9, m: mk, cool: 0 });
     }
   }
-  cars.forEach((c, i) => { c.nid = i + 1; c._ox = c.x; c._oy = c.y; }); peds.forEach((p, i) => { if (!p.beach) p.nid = i + 1; });
+  cars.forEach((c, i) => { c.nid = i + 1; c._ox = c.x; c._oy = c.y; }); peds.forEach((p, i) => { p.nid = i + 1; });
   Math.random = __rand;
   // ============================================================================
   // CRIME CITY 3D v2 — 멀티플레이 레이어 (Supabase Realtime)
@@ -2210,14 +2211,23 @@
     }
     document.addEventListener('pointerlockchange', () => {
       locked = document.pointerLockElement === rd.domElement;
-      if (!locked && wantLock && !overlayOpen()) msg('🖱 클릭하면 마우스 모드로 돌아가요 (P로 완전히 끄기)');
+      if (!locked && mapOpen && wantLock) toggleMap(false);
+      if (!locked && wantLock && !overlayOpen()) msg('🖱 클릭하면 마우스 모드로 돌아가요 (P로 완전히 끄기) · 지도는 M으로 닫으면 바로 조준돼요');
     });
     // 마우스 모드가 켜져 있으면 화면을 클릭하는 순간 다시 잠금
     rd.domElement.addEventListener('mousedown', () => { if (wantLock && !locked) reqLock(); });
+    // 잠금 상태로 지도를 볼 때: 클릭은 총이 아니라 지도 선택
+    window.addEventListener('mousedown', e => {
+      if (!(mapOpen && locked)) return;
+      e.stopImmediatePropagation(); e.preventDefault(); mdown = false;
+      if (e.button === 0) { const r = pickFriend(vcx, vcy); if (r) mapClick(vcx, vcy); } else toggleMap(false);
+    }, true);
+    window.addEventListener('mouseup', e => { if (mapOpen && locked) { e.stopImmediatePropagation(); mdown = false; } }, true);
     rd.domElement.style.cursor = 'crosshair';
     let msX = 0, msY = 0, mouseUsed = false;
     window.addEventListener('mousemove', e => {
       if (!locked) { msX = e.clientX; msY = e.clientY; mouseUsed = true; return; }
+      if (mapOpen) { vcx = Math.max(0, Math.min(innerWidth, vcx + (e.movementX || 0))); vcy = Math.max(0, Math.min(innerHeight, vcy + (e.movementY || 0))); hoverR = pickFriend(vcx, vcy); return; }
       const dx = e.movementX || 0, dy = e.movementY || 0;
       if (P.onFoot) { if (!(tased > 0) && !P.climb) P.a += dx * 0.0032 * (scope ? 0.35 : 1); }
       else ay = Math.max(-3.2, Math.min(3.2, ay + dx * 0.004));
@@ -2350,7 +2360,8 @@
     }
     function setName(n) {
       n = String(n || '').trim().slice(0, 12); if (!n) return;
-      blurUI(); myName = n; LS.set('cc_name', n); addFeed('닉네임: ' + n, '#ffd23f');
+      if (n === myName) { blurUI(); return; }
+      saveProfile(true); blurUI(); myName = n; LS.set('cc_name', n); addFeed('닉네임: ' + n, '#ffd23f'); loadProfile();
       if (ch) ch.track({ id: myId, name: myName, color: myColor }); refreshUI();
     }
     function joinCode(c) {
@@ -2368,6 +2379,7 @@
       if (!sb) {
         if (!window.supabase) { status = '오프라인 (싱글플레이)'; refreshUI(); return; }
         sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 30 } } });
+        setTimeout(loadProfile, 0);
       }
       const c = sb.channel('crimecity:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
       ch = c;
@@ -2504,7 +2516,7 @@
     function bustedEv(loss) { if (ride) exitRide(true); title(`🚔 ${myName} 체포됨!`, `벌금 -$${(loss || 0).toLocaleString()}`, '#7fb6ff'); send('bust', { loss }); }
 
     // ---------------------------------------------------------------- 큰 지도 (M) + TP
-    let mapBase = null, mapGeo = null, hoverR = null;
+    let mapBase = null, mapGeo = null, hoverR = null, vcx = 0, vcy = 0;
     function buildMapBase(S) {
       const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), s = S / W;
       g.fillStyle = '#2a2c32'; g.fillRect(0, 0, S, S);
@@ -2544,8 +2556,8 @@
     function toggleMap(v) {
       mapOpen = v === undefined ? !mapOpen : v;
       mapC.style.display = mapOpen ? 'block' : 'none';
-      if (mapOpen && locked) document.exitPointerLock();
-      if (!mapOpen) setTimeout(reqLock, 0);
+      if (mapOpen) { vcx = innerWidth / 2; vcy = innerHeight / 2; hoverR = null; mdown = false; }
+      else setTimeout(reqLock, 0);
       if (mapOpen) { mapC.width = innerWidth; mapC.height = innerHeight; }
     }
     mapC.addEventListener('mousemove', e => { hoverR = pickFriend(e.clientX, e.clientY); mapC.style.cursor = hoverR ? 'pointer' : 'default'; });
@@ -2589,6 +2601,7 @@
       g.font = 'bold 18px system-ui'; g.fillStyle = '#fff'; g.fillText('🗺  도시 지도 — 친구를 클릭하면 텔레포트 (M / Esc 닫기)', w / 2, Math.max(18, oy - 14));
       g.font = '12px system-ui'; g.fillStyle = 'rgba(255,255,255,.75)';
       g.fillText('🏦 은행  🎰 카지노  💎 보석상  🏧 ATM  ⛽ 주유소  🅿️ 정산소  🚓 경찰서  ●파랑 경찰', w / 2, Math.min(h - 10, oy + S + 16));
+      if (locked) { g.save(); g.translate(vcx, vcy); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 17); g.lineTo(4.5, 13); g.lineTo(8, 20); g.lineTo(10.5, 19); g.lineTo(7, 12); g.lineTo(12.5, 12); g.closePath(); g.fill(); g.stroke(); g.restore(); }
     }
     function teleport(r) {
       if (activeInterior) { msg('건물 안에서는 TP 할 수 없습니다'); return; }
@@ -2691,7 +2704,9 @@
         if (nc.length >= 140) break;
       }
       for (const p of peds) {
-        if (!p.nid) continue; const x = p.h ? p.t : p.k * B + p.off, y = p.h ? p.k * B + p.off : p.t;
+        if (!p.nid) continue;
+        if (p.beach && p.beach !== 'walk' && p.beach !== 'swim') continue;
+        const x = p.beach ? p.x : p.h ? p.t : p.k * B + p.off, y = p.beach ? p.y : p.h ? p.k * B + p.off : p.t;
         if (!near(x, y, 2000)) continue;
         np.push([p.nid, r1(p.t), p.s, p.dead > 0 ? 1 : 0]); if (np.length >= 160) break;
       }
@@ -2724,6 +2739,7 @@
       for (const p of peds) {
         if (!p._sync || now - p._sync > 2500 || p.dead > 0) continue;
         p.t = Math.abs(p._tt - p.t) > 200 ? p._tt : p.t + (p._tt - p.t) * k;
+        if (p.beach) continue;
         p.m.position.set(p.h ? p.t : p.k * B + p.off, 7, p.h ? p.k * B + p.off : p.t);
       }
     }
@@ -2853,6 +2869,35 @@
       ctx.restore();
     }
 
+
+    // ---------------------------------------------------------------- 닉네임별 저장 (Supabase cc_profiles)
+    let profReady = false, profSig = '', profT = performance.now(), profBusy = false;
+    async function loadProfile() {
+      if (!sb) return; const nm = myName; profReady = false;
+      try {
+        const { data, error } = await sb.from('cc_profiles').select('money,own').eq('name', nm).maybeSingle();
+        if (nm !== myName || error) return;
+        if (data) {
+          money = Math.max(0, Number(data.money) || 0);
+          for (const k of Object.keys(own)) delete own[k]; Object.assign(own, data.own || {});
+          LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money));
+          if (wi >= 6 && !own[wi]) wi = 0;
+          const nw = Object.keys(own).length;
+          addFeed(`💾 ${nm} 저장 불러옴 · $${Math.round(money).toLocaleString()}${nw ? ' · 특수무기 ' + nw + '개' : ''}`, '#7fd');
+          profSig = JSON.stringify([Math.round(money), own]); profReady = true;
+        } else { profReady = true; await saveProfile(true); addFeed(`💾 ${nm} 새 저장 만듦 (다른 기기에서도 이 닉네임이면 이어짐)`, '#7fd'); }
+      } catch (e) {}
+    }
+    async function saveProfile(force) {
+      if (!sb || !profReady || profBusy) return;
+      const sig = JSON.stringify([Math.round(money), own]); if (!force && sig === profSig) return;
+      profBusy = true; profSig = sig;
+      try { await sb.from('cc_profiles').upsert({ name: myName, money: Math.max(0, Math.round(money)), own, updated_at: new Date().toISOString() }); } catch (e) { profSig = ''; }
+      profBusy = false;
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) saveProfile(true); });
+    window.addEventListener('pagehide', () => saveProfile(true));
+
     // ---------------------------------------------------------------- 매 프레임
     let saveT = 0, hbT = 0;
     function tick(dt) {
@@ -2915,6 +2960,7 @@
       saveT -= dt; if (saveT <= 0) { saveT = 3; LS.set('cc_money', String(money)); }
       shopTick(dt);
       npcTick(dt);
+      if (performance.now() - profT > 6000) { profT = performance.now(); saveProfile(); }
     }
     function hud() {
       ctx.save(); ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = 'bold 15px system-ui';
@@ -2974,7 +3020,7 @@
     refreshUI();
     setTimeout(() => go(myCode), 300);
     setInterval(() => { if (lastD && performance.now() - lastForce > 2500) { lastForce = performance.now(); send('s', lastD); } }, 2500);
-    return { tick, hud, mini, shot, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 400 : 230, spd: () => spdT > 0 ? 2 : 1 };
+    return { tick, hud, mini, shot, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 400 : 230, spd: () => spdT > 0 ? 2 : 1 };
   })();
 
   let last = performance.now();
