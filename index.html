@@ -2664,6 +2664,7 @@
     let nidMap = new Map(), nidT = 0, pedMap = new Map(), npcQuiet = false;
     function nidRefresh() { nidMap = new Map(); for (const c of cars) if (c.nid) nidMap.set(c.nid, c); }
     for (const p of peds) if (p.nid) pedMap.set(p.nid, p);
+    nidRefresh();
     const drivenBy = new Map();
     function npcDrive(r) {
       // 친구가 운전 중인 '진짜' 차량을 그 친구 위치로 옮김 (복제 방지)
@@ -2711,7 +2712,7 @@
       }
     }
     function npcTick(dt) {
-      nidT -= dt; if (nidT <= 0) { nidT = 1; nidRefresh(); }
+      if (performance.now() - nidT > 1000) { nidT = performance.now(); nidRefresh(); }
       if (!joined() || !remotes.size || isHost()) return;
       const now = performance.now(), k = Math.min(1, dt * 8);
       for (const c of cars) {
