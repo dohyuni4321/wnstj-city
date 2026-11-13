@@ -231,7 +231,7 @@
         else if (en > 25) { slow = true; msg('불릿타임!'); }
       }
     }
-    if (k === ' ' && !e.repeat && P.onFoot && !P.ride && !P.climb && !jk && tased <= 0 && !(P.jh > 0)) { P.jv = MP.jv(); P.jh = 0.01; }
+    if (k === ' ' && !e.repeat && P.onFoot && !P.ride && !P.climb && !jk && tased <= 0 && !(P.jh > 0)) { MP.jump(); }
     if (k === ' ' || k.startsWith('arrow')) e.preventDefault();
   });
   window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = 0);
@@ -243,7 +243,8 @@
   window.addEventListener('blur', () => { mdown = 0; aim = 0; });
 
   // Touch Support Bindings
-  document.getElementById('btn-jump').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && !P.ride && !P.climb && !(P.jh > 0) && tased <= 0) { P.jv = MP.jv(); P.jh = 0.01; } });
+  document.getElementById('btn-jump').addEventListener('touchstart', (e)=>{ e.preventDefault(); keys[' '] = 1; MP.jump(); });
+  document.getElementById('btn-jump').addEventListener('touchend', (e)=>{ e.preventDefault(); keys[' '] = 0; });
   document.getElementById('btn-map').addEventListener('touchstart', (e)=>{ e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })); });
   document.getElementById('btn-enter').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (!MP.rideKey()) toggle(); });
   document.getElementById('btn-fire').addEventListener('touchstart', (e)=>{ e.preventDefault(); mdown = 1; });
@@ -433,7 +434,7 @@
     return lx > m && lx < B - m && ly > m && ly < B - m;
   }
   const bh = (x, y) => { const b = bAt(x, y); return b && !b.park && !b.pg && b.h && solid(x, y, 0) ? b.h : 0; };
-  const pS = (x, y) => P.roof ? (Math.abs(x - P.roof.cx) > 126 || Math.abs(y - P.roof.cz) > 126) : solid(x, y, 6);
+  const pS = (x, y) => MP.pS(x, y);
 
   // ============================================================================
   // GAME STATE & WEAPONS DATA
@@ -1638,8 +1639,7 @@
   }
 
   function update(dt) {
-    if (!P.onFoot || P.climb) { P.jh = 0; P.jv = 0; }
-    else if (P.jh > 0) { P.jv -= 700 * dt; P.jh += P.jv * dt; if (P.jh <= 0) { P.jh = 0; P.jv = 0; } }
+    MP.phys(dt);
     if (wi === 5 && P.onFoot && aim !== aimP) scope = !!aim; aimP = aim;
     if (heat <= 3) martial = false;
     T += dt; hc -= dt; tt -= dt; ap = Math.max(-1, Math.min(1, ap + ((keys.arrowup ? 1 : 0) - (keys.arrowdown ? 1 : 0)) * 1.1 * dt));
@@ -1892,8 +1892,17 @@
     const d = sc2 ? 6 : P.onFoot ? (P.ride ? 80 : aim ? 32 : 55) : hl ? 140 : 80 + sp * 0.12;
     const h = (sc2 ? 15 : P.onFoot ? (P.ride ? 34 : aim ? 21 : 28) : hl ? 55 : 42) + zz;
     shake *= 0.9; const ca = camA + (P.onFoot ? 0 : ay);
+    if (P.onFoot && MP.locked() && !sc2 && !P.ride && !P.climb) {
+      const a2 = P.a, pv = zz + 15, cp = Math.cos(ap), spp = Math.sin(ap), fx2 = Math.cos(a2), fy2 = Math.sin(a2), rx2 = Math.cos(a2 + 1.5708), ry2 = Math.sin(a2 + 1.5708), so = aim ? 8 : 11;
+      let dd = aim ? 30 : 50, cx2 = 0, cy2 = 0, ch2 = 0;
+      for (let i = 0; i < 7; i++) { cx2 = tg.x - fx2 * cp * dd + rx2 * so; cy2 = tg.y - fy2 * cp * dd + ry2 * so; ch2 = pv - spp * dd; if (bh(cx2, cy2) < ch2 - 2) break; dd *= 0.7; }
+      ch2 = Math.max(ch2, bh(cx2, cy2) + 3);
+      cm.position.set(cx2 + (Math.random() - 0.5) * shake, ch2 + (Math.random() - 0.5) * shake, cy2);
+      cm.lookAt(tg.x + fx2 * cp * 500 + rx2 * so, pv + spp * 500, tg.y + fy2 * cp * 500 + ry2 * so);
+    } else {
     cm.position.set(tg.x - Math.cos(ca) * d + (Math.random() - 0.5) * shake, h + (Math.random() - 0.5) * shake, tg.y - Math.sin(ca) * d);
     cm.lookAt(tg.x + Math.cos(ca) * (sc2 ? 300 : 30), 8 + zz + Math.tan(ap) * (sc2 ? 300 : 60), tg.y + Math.sin(ca) * (sc2 ? 300 : 30));
+    }
     cm.fov = sc2 ? 22 : (P.onFoot && aim ? 46 : 65 + Math.min(sp, 560) / 360 * 15);
     cm.updateProjectionMatrix(); rd.render(sc, cm);
   }
@@ -2430,7 +2439,7 @@
     }
     function applyState(r, d) {
       r.seen = performance.now();
-      r.tx = d.x; r.ty = d.y; r.tz = d.z || 0; r.ta = d.a || 0; r.onFoot = !!d.f; r.heat = d.h || 0; r.rd = d.rd || null; if (d.m !== undefined) r.money = d.m; r.gd = !!d.gd; r.kind = d.f ? null : (d.k || 'car'); r.nid = d.f ? 0 : (d.ni || 0);
+      r.tx = d.x; r.ty = d.y; r.tz = d.z || 0; r.ta = d.a || 0; r.onFoot = !!d.f; r.heat = d.h || 0; r.rd = d.rd || null; if (d.m !== undefined) r.money = d.m; r.gd = !!d.gd; r.jp = d.jp || 0; r.kind = d.f ? null : (d.k || 'car'); r.nid = d.f ? 0 : (d.ni || 0);
       if (d.n && d.n !== r.name) rename(r, d.n);
       setCarModel(r, d.f ? '' : (d.k || 'car'), d.cc, d.tx, d.pc);
     }
@@ -2756,6 +2765,55 @@
       if (Math.hypot(c.x - P.x, c.y - P.y) < 1500) playSound('boom');
     }
 
+
+    // ---------------------------------------------------------------- 진짜 높이 점프 · 옥상 착지 · 제트팩
+    let jpFuel = 100, jpOn = false, jpLast = 0;
+    function pSolid(x, y) {
+      if (activeInterior || P.climb || !P.onFoot) return solid(x, y, 6);
+      const h = bh(x, y);
+      if (h > 0) return h > P.z + 4;            // 내 발보다 높은 벽만 막힘
+      if (P.z > 12) return !bAt(x, y) && !inW(x, y); // 공중/옥상 높이에선 길 위로 자유롭게
+      return solid(x, y, 6);
+    }
+    function doJump() {
+      if (!P.onFoot || P.ride || P.climb || jk || tased > 0 || P.air) return;
+      P.air = 1; P.vzj = jumpT > 0 ? 600 : 230; P.zPk = P.z; P.roof = null;
+    }
+    function phys(dt) {
+      P.jh = 0;
+      if (!P.onFoot || P.ride || P.climb || activeInterior) { P.air = 0; P.vzj = 0; jpOn = false; return; }
+      const fl = bh(P.x, P.y);
+      if (!P.air && P.z > fl + 1) { P.air = 1; P.vzj = 0; P.zPk = P.z; P.roof = null; }
+      jpOn = false;
+      if (P.air) {
+        if (own.jp && keys[' '] && jpFuel > 0 && !(tased > 0)) { jpOn = true; jpLast = T; jpFuel = Math.max(0, jpFuel - 20 * dt); P.vzj = Math.min(300, P.vzj + 1550 * dt); }
+        P.vzj -= 700 * dt; P.z += P.vzj * dt; P.zPk = Math.max(P.zPk || 0, P.z);
+        if (P.z > 900) { P.z = 900; P.vzj = Math.min(P.vzj, 0); }
+        const f2 = bh(P.x, P.y);
+        if (P.z <= f2 && P.vzj <= 0) {
+          const drop = (P.zPk || P.z) - f2;
+          P.z = f2; P.air = 0; P.vzj = 0; P.roof = f2 > 0 ? bAt(P.x, P.y) : null;
+          if (drop > 170 && !(jumpT > 0) && !(god > 0) && T - jpLast > 0.6) { tased = Math.min(2.5, drop / 90); shake = 10; msg('착지 충격!'); }
+          else if (f2 > 0 && drop > 20) msg('🏢 옥상 착지');
+        }
+      } else { P.z = fl; if (fl > 0 && !P.roof) P.roof = bAt(P.x, P.y); if (!fl) P.roof = null; }
+      if (!P.air) jpFuel = Math.min(100, jpFuel + 25 * dt);
+    }
+    function jpMesh() {
+      const g = new THREE.Group(), pk = M(0x3a4048), fl = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85 });
+      for (const z of [-2.2, 2.2]) {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 8, 10), pk); t.position.set(-4.2, 10, z); g.add(t);
+        const f = new THREE.Mesh(new THREE.ConeGeometry(1.4, 6, 8), fl); f.rotation.x = Math.PI; f.position.set(-4.2, 3, z); f.name = 'flame'; g.add(f);
+      }
+      return g;
+    }
+    let myJp = null;
+    function jpVis(holder, cur, on, fire) {
+      if (on && !cur) { cur = jpMesh(); holder.add(cur); }
+      if (cur) { cur.visible = !!on; for (const c of cur.children) if (c.name === 'flame') { c.visible = !!fire; c.scale.y = 0.8 + Math.random() * 0.6; } }
+      return cur;
+    }
+
     // ---------------------------------------------------------------- 상점 (U)
     const own = (() => { try { return JSON.parse(LS.get('cc_own') || '{}'); } catch (e) { return {}; } })();
     let god = 0, jumpT = 0, spdT = 0, shopOpen = false, myAura = null;
@@ -2774,7 +2832,8 @@
       { id: 'mrl', ic: '🚀', n: '멀티 로켓런처', d: '8연발 폭발 로켓', p: 70000, w: 8 },
       { id: 'god', ic: '🛡️', n: '무적 포션', d: '30초간 체포·테이저·차량 피해 무효', p: 8000 },
       { id: 'spd', ic: '💨', n: '스피드 포션', d: '30초간 걷기·달리기 2배', p: 4000 },
-      { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 점프 3배 높이', p: 3000 },
+      { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 옥상까지 점프 · 낙하 충격 없음', p: 3000 },
+      { id: 'jp', ic: '🎒', n: '제트팩', d: '공중에서 Space 꾹 → 비행 · 연료 자동 충전 (영구)', p: 20000, perm: 'jp' },
       { id: 'gren', ic: '💣', n: '수류탄 ×5', d: '8 / G로 투척', p: 1500 },
       { id: 'tnt', ic: '🧨', n: 'TNT ×3', d: '9 / T로 설치', p: 2500 },
       { id: 'ammo', ic: '📦', n: '탄약 전부 충전', d: '모든 무기 탄창 가득', p: 500 },
@@ -2806,7 +2865,7 @@
     function renderShop() {
       $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString();
       $('shopGr').innerHTML = ITEMS.map(it => {
-        const ow = it.w && own[it.w], no = !ow && money < it.p;
+        const ow = (it.w && own[it.w]) || (it.perm && own[it.perm]), no = !ow && money < it.p;
         return `<div class="it${ow ? ' own' : no ? ' no' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}</div></div><div class="pr">${ow ? '보유 중' : '$' + it.p.toLocaleString()}</div></div>`;
       }).join('');
     }
@@ -2821,10 +2880,12 @@
     function buy(id) {
       const it = ITEMS.find(x => x.id === id); if (!it) return;
       if (it.w && own[it.w]) { selW(it.w); toggleShop(false); return; }
+      if (it.perm && own[it.perm]) { msg('이미 갖고 있어요'); return; }
       if (id === 'fix' && P.onFoot) { msg('차에 타고 있을 때만 수리할 수 있어요'); return; }
       if (money < it.p) { msg(`돈이 부족해요 ($${(it.p - Math.round(money)).toLocaleString()} 더 필요)`); playSound('shoot'); return; }
       money -= it.p; playSound('cash');
       if (it.w) { own[it.w] = 1; LS.set('cc_own', JSON.stringify(own)); am[it.w] = WP[it.w].mag; if (P.onFoot) { wi = it.w; rel = 0; scope = false; } event(`님이 ${it.n}을(를) 샀습니다!`); }
+      else if (it.perm) { own[it.perm] = 1; LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg('🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요'); }
       else if (id === 'god') { god = 30; event('님이 무적 포션을 마셨습니다 (30초)'); }
       else if (id === 'spd') spdT = 30;
       else if (id === 'jmp') jumpT = 30;
@@ -2859,12 +2920,13 @@
       if (god > 0) b.push(['🛡️ 무적', god, '#ffd23f']);
       if (spdT > 0) b.push(['💨 스피드', spdT, '#6ff']);
       if (jumpT > 0) b.push(['🦘 슈퍼점프', jumpT, '#9f6']);
+      if (own.jp) b.push(['🎒 연료', jpFuel * 0.3, jpOn ? '#f93' : '#fa6', Math.round(jpFuel) + '%']);
       ctx.save(); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = 'bold 14px system-ui'; ctx.shadowBlur = 0;
       b.forEach((x, i) => {
         const y = 132 + i * 26;
         ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(16, y - 10, 150, 20);
         ctx.fillStyle = x[2]; ctx.globalAlpha = 0.35; ctx.fillRect(16, y - 10, 150 * x[1] / 30, 20); ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fff'; ctx.fillText(`${x[0]}  ${Math.ceil(x[1])}초`, 22, y);
+        ctx.fillStyle = '#fff'; ctx.fillText(`${x[0]}  ${x[3] || Math.ceil(x[1]) + '초'}`, 22, y);
       });
       ctx.restore();
     }
@@ -2908,7 +2970,7 @@
       if (joined() && sendT <= 0) {
         sendT = P.onFoot ? 1 / 6 : 1 / 10;
         const k = P.onFoot ? null : P.car, o = k || P;
-        const d = { n: myName, x: r1(o.x), y: r1(o.y), z: r1((k ? k.z : P.z + (P.jh || 0)) || 0), a: r2(o.a), f: P.onFoot ? 1 : 0, h: Math.ceil(heat), rd: ride || 0, m: Math.round(money), gd: god > 0 ? 1 : 0 };
+        const d = { n: myName, x: r1(o.x), y: r1(o.y), z: r1((k ? k.z : P.z + (P.jh || 0)) || 0), a: r2(o.a), f: P.onFoot ? 1 : 0, h: Math.ceil(heat), rd: ride || 0, m: Math.round(money), gd: god > 0 ? 1 : 0, jp: own.jp ? (jpOn ? 2 : 1) : 0 };
         if (k) { d.ni = k.nid || 0; d.k = k.kind || 'car'; d.cc = k.color; d.tx = k.taxi ? 1 : 0; d.pc = k.type === 'c' ? 1 : 0; }
         const sig = JSON.stringify(d);
         if (sig !== lastSent || now - lastForce > 1500) { lastSent = sig; lastForce = now; lastD = d; send('s', d); }
@@ -2922,6 +2984,7 @@
         const spd = Math.hypot(r.x - px, r.y - py) / Math.max(dt, 1e-3);
         const show = r.onFoot && !r.rd;
         r.mesh.visible = show; r.mesh.position.set(r.x, r.z, r.y); r.mesh.rotation.y = -r.a;
+        r.jpm = jpVis(r.mesh, r.jpm, r.jp > 0, r.jp === 2);
         if (r.gd && !r.aura) { r.aura = auraMesh(); sc.add(r.aura); }
         if (r.aura) { r.aura.visible = r.gd; r.aura.position.set(r.x, r.z + (r.onFoot ? 10 : 8), r.y); r.aura.scale.setScalar((r.onFoot ? 1 : 2) * (1 + Math.sin(T * 6) * 0.06)); }
         if (show) { r.walk += dt * Math.min(spd, 220) * 0.08; const s = Math.sin(r.walk) * 0.6; r.mesh.userData.legs[0].rotation.z = s; r.mesh.userData.legs[1].rotation.z = -s; }
@@ -2960,6 +3023,7 @@
       saveT -= dt; if (saveT <= 0) { saveT = 3; LS.set('cc_money', String(money)); }
       shopTick(dt);
       npcTick(dt);
+      myJp = jpVis(foot, myJp, own.jp, jpOn);
       if (performance.now() - profT > 6000) { profT = performance.now(); saveProfile(); }
     }
     function hud() {
@@ -3020,7 +3084,7 @@
     refreshUI();
     setTimeout(() => go(myCode), 300);
     setInterval(() => { if (lastD && performance.now() - lastForce > 2500) { lastForce = performance.now(); send('s', lastD); } }, 2500);
-    return { tick, hud, mini, shot, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 400 : 230, spd: () => spdT > 0 ? 2 : 1 };
+    return { tick, hud, mini, shot, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1), phys, pS: pSolid, jump: doJump };
   })();
 
   let last = performance.now();
