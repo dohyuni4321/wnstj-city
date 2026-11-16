@@ -208,7 +208,7 @@
     if (k === 't' && !e.repeat && P.onFoot && !P.climb && tnt > 0) { if (tcd > 0) msg(`🧨 TNT 쿨타임 ${tcd.toFixed(1)}초`); else throwTNT(); }
     if (!e.repeat) {
       if (k === 'r' && P.onFoot && rel <= 0 && am[wi] < WP[wi].mag) { rel = WP[wi].rel; msg('장전 중...'); }
-      if (P.onFoot && k >= '1' && k <= '6') { wi = +k - 1; rel = 0; scope = false; msg(WP[wi].n); }
+      if (P.onFoot && k >= '1' && k <= '6') { wi = +k - 1; rel = 0; scope = false; wmsg(wi); }
       if (k === 'g' && P.onFoot && !P.climb && gren > 0 && gcd > 0) msg(`💣 수류탄 쿨타임 ${gcd.toFixed(1)}초`);
       else if (k === 'g' && P.onFoot && !P.climb && gren > 0) {
         gcd = 3; gren--; heat = Math.min(5, heat + 0.2);
@@ -454,25 +454,25 @@
   // GAME STATE & WEAPONS DATA
   // ============================================================================
   const cars = [], peds = [], cash = [], fx = [], meshes = new Map(), bul = [], gr = [];
-  let wi = 0, rel = 0, cd = 0, gren = 3, en = 100, slow = false, dsh = 0, dcd = 0, gcd = 0, tcd = 0, tased = 0, nit = 100, scope = false, ay = 0, ap = 0;
+  let wi = 0, rel = 0, cd = 0, gren = 3, en = 100, slow = false, dsh = 0, dcd = 0, gcd = 0, tcd = 0, spinV = 0, pcnt = 0, flAcc = 0, flSnd = 0, flNet = 0, tased = 0, nit = 100, scope = false, ay = 0, ap = 0;
   const trc = [], mcs = {}, mc = c => mcs[c] || (mcs[c] = new THREE.MeshBasicMaterial({ color: c }));
   const offs = [], tz = [], tzM = new THREE.MeshBasicMaterial({ color: 0x66ddff });
 
   const WP = [
-    { n: '권총', mag: 12, cd: 0.16, dmg: 34, pel: 1, sp: 0, rel: 1.2, v: 750, life: 1.2, h: 0.12, k: 1.5, col: 0xfff2a0, sz: 1, len: 1 },
-    { n: '기관단총', mag: 30, cd: 0.07, dmg: 14, pel: 1, sp: 0.07, rel: 1.6, v: 800, life: 1.1, h: 0.1, k: 1, col: 0xffd060, sz: 0.8, len: 1.5 },
-    { n: '산탄총', mag: 6, cd: 0.8, dmg: 22, pel: 7, sp: 0.2, rel: 1.8, v: 700, life: 0.35, h: 0.3, k: 4, col: 0xffa040, sz: 0.7, len: 2.2 },
-    { n: '로켓런처', mag: 3, cd: 1, dmg: 100, pel: 1, sp: 0, rel: 2.2, v: 420, life: 2, h: 0.5, k: 5, col: 0xff5522, sz: 2.4, len: 2.4, rk: 1 },
-    { n: '스턴건', mag: 8, cd: 0.45, dmg: 0, pel: 1, sp: 0, rel: 1.4, v: 900, life: 0.6, h: 0.04, k: 0.5, col: 0x66ccff, sz: 1.2, len: 1.2 },
-    { n: '저격총', mag: 5, cd: 1.1, dmg: 140, pel: 0, sp: 0, rel: 2.2, v: 0, life: 0, h: 0.4, k: 6, col: 0xffffff, sz: 1, len: 3.2, hs: 1 },
-    { n: '미니건', mag: 150, cd: 0.04, dmg: 20, pel: 1, sp: 0.06, rel: 3, v: 900, life: 1.2, h: 0.05, k: 1.2, col: 0xff5a3c, sz: 0.9, len: 2.8 },
-    { n: '레일건', mag: 4, cd: 0.8, dmg: 350, pel: 1, sp: 0, rel: 2.4, v: 2400, life: 0.8, h: 0.5, k: 7, col: 0xb06bff, sz: 1.8, len: 3 },
-    { n: '멀티 로켓런처', mag: 8, cd: 0.32, dmg: 100, pel: 1, sp: 0.03, rel: 3, v: 480, life: 2, h: 0.5, k: 4, col: 0xff2e88, sz: 2.2, len: 2.6, rk: 1 },
-    { n: '화염방사기', mag: 100, cd: 0.045, dmg: 11, pel: 2, sp: 0.18, rel: 2.4, v: 380, life: 0.42, h: 0.12, k: 0.6, col: 0xff7a1a, sz: 1.8, len: 2.4 },
-    { n: '플라즈마 라이플', mag: 24, cd: 0.14, dmg: 55, pel: 1, sp: 0.01, rel: 2.0, v: 1300, life: 1, h: 0.12, k: 1.8, col: 0x3dffb0, sz: 1.5, len: 2.6 },
-    { n: '유탄발사기', mag: 6, cd: 0.7, dmg: 80, pel: 1, sp: 0, rel: 2.6, v: 520, life: 1.4, h: 0.45, k: 4, col: 0xb8ff3c, sz: 2, len: 2.2, rk: 1 },
-    { n: '석궁', mag: 8, cd: 0.7, dmg: 150, pel: 1, sp: 0, rel: 1.6, v: 1500, life: 1.1, h: 0.01, k: 1, col: 0xd8b98a, sz: 0.9, len: 2 },
-    { n: '레이저 소총', mag: 80, cd: 0.05, dmg: 16, pel: 1, sp: 0.005, rel: 2.2, v: 2200, life: 0.7, h: 0.08, k: 0.6, col: 0xff2e5a, sz: 1.1, len: 2.8 }
+    { n: '권총', mag: 12, cd: 0.16, dmg: 34, pel: 1, sp: 0, rel: 1.2, v: 750, life: 1.2, h: 0.12, k: 1.5, col: 0xfff2a0, sz: 1, len: 1, crit: 1, tip: '3발째마다 치명타 (×2.2)' },
+    { n: '기관단총', mag: 30, cd: 0.07, dmg: 14, pel: 1, sp: 0.07, rel: 1.6, v: 800, life: 1.1, h: 0.1, k: 1, col: 0xffd060, sz: 0.8, len: 1.5, spin: 1.7, rampN: 14, tip: '쏠수록 연사가 점점 빨라짐' },
+    { n: '산탄총', mag: 6, cd: 0.8, dmg: 22, pel: 7, sp: 0.2, rel: 1.8, v: 700, life: 0.35, h: 0.3, k: 4, col: 0xffa040, sz: 0.7, len: 2.2, fall: 1, tip: '가까울수록 강함 · 멀면 약함' },
+    { n: '로켓런처', mag: 3, cd: 1, dmg: 100, pel: 1, sp: 0, rel: 2.2, v: 420, life: 2, h: 0.5, k: 5, col: 0xff5522, sz: 2.4, len: 2.4, rk: 1, tip: '큰 폭발' },
+    { n: '스턴건', mag: 8, cd: 0.45, dmg: 0, pel: 1, sp: 0, rel: 1.4, v: 900, life: 0.6, h: 0.04, k: 0.5, col: 0x66ccff, sz: 1.2, len: 1.2, tip: '맞은 상대를 기절시킴' },
+    { n: '저격총', mag: 5, cd: 1.1, dmg: 140, pel: 0, sp: 0, rel: 2.2, v: 0, life: 0, h: 0.4, k: 6, col: 0xffffff, sz: 1, len: 3.2, hs: 1, tip: '한 방 · 우클릭 스코프' },
+    { n: '미니건', mag: 150, cd: 0.04, dmg: 20, pel: 1, sp: 0.06, rel: 3, v: 900, life: 1.2, h: 0.05, k: 1.2, col: 0xff5a3c, sz: 0.9, len: 2.8, spin: 3.4, rampN: 26, tip: '예열 필요 · 달궈지면 폭풍 연사' },
+    { n: '레일건', mag: 4, cd: 0.8, dmg: 350, pel: 1, sp: 0, rel: 2.4, v: 2400, life: 0.8, h: 0.5, k: 7, col: 0xb06bff, sz: 1.8, len: 3, pr: 99, thru: 1, tip: '건물·적 전부 관통' },
+    { n: '멀티 로켓런처', mag: 8, cd: 0.32, dmg: 100, pel: 1, sp: 0.03, rel: 3, v: 480, life: 2, h: 0.5, k: 4, col: 0xff2e88, sz: 2.2, len: 2.6, rk: 1, home: 1, tip: '적을 따라가는 유도 로켓' },
+    { n: '화염방사기', mag: 100, cd: 0.045, dmg: 0, pel: 0, sp: 0, rel: 2.4, v: 0, life: 0, h: 0.12, k: 0.6, col: 0xff7a1a, sz: 1.8, len: 2.4, flame: 1, tip: '연기 나는 불길 · 건물에 불이 붙음' },
+    { n: '플라즈마 라이플', mag: 24, cd: 0.14, dmg: 55, pel: 1, sp: 0.01, rel: 2.0, v: 1300, life: 1, h: 0.12, k: 1.8, col: 0x3dffb0, sz: 1.5, len: 2.6, pr: 2, pls: 1, tip: '관통 + 맞을 때마다 폭발파' },
+    { n: '유탄발사기', mag: 6, cd: 0.7, dmg: 80, pel: 1, sp: 0, rel: 2.6, v: 520, life: 1.4, h: 0.45, k: 4, col: 0xb8ff3c, sz: 2, len: 2.2, rk: 1, clu: 1, tip: '폭발 후 파편이 3번 더 터짐' },
+    { n: '석궁', mag: 8, cd: 0.7, dmg: 150, pel: 1, sp: 0, rel: 1.6, v: 1500, life: 1.1, h: 0.01, k: 1, col: 0xd8b98a, sz: 0.9, len: 2, pr: 3, q: 1, tip: '소음 없음 · 3명 관통' },
+    { n: '레이저 소총', mag: 80, cd: 0.05, dmg: 16, pel: 1, sp: 0.005, rel: 2.2, v: 2200, life: 0.7, h: 0.08, k: 0.6, col: 0xff2e5a, sz: 1.1, len: 2.8, pr: 99, spin: 1.5, rampN: 10, tip: '전부 관통 · 쏠수록 빨라짐' }
   ], am = WP.map(w => w.mag);
 
   const pp = p => p.beach ? [p.x, p.y] : [p.h ? p.t : p.k * B + p.off, p.h ? p.k * B + p.off : p.t];
@@ -1515,9 +1515,76 @@
     pole.position.y=13;bulb.position.y=26;group.add(pole,bulb);group.position.set(l.x,0,l.y);sc.add(group);
     fallenLamps.push({m:group,t:0,dir:Math.random()*6.28});
   }
+  // ===== v4 무기 특성: 화염방사기 · 유도 · 관통 · 플라즈마 =====
+  const flp = [], flSph = new THREE.SphereGeometry(1, 6, 6);
+  function flameSpawn(x, y, z, vx, vy, vz, smoke) {
+    const m = new THREE.Mesh(flSph, new THREE.MeshBasicMaterial({ color: smoke ? 0x3a3a3e : 0xffd23f, transparent: true, opacity: smoke ? 0.5 : 0.95, depthWrite: false }));
+    m.position.set(x, z, y); sc.add(m);
+    flp.push({ m, x, y, z, vx, vy, vz, age: 0, life: smoke ? rnd(1.1, 1.8) : rnd(0.34, 0.48), sm: !!smoke });
+  }
+  function flameUpd(dt) {
+    for (let i = flp.length - 1; i >= 0; i--) {
+      const f = flp[i]; f.age += dt; const k = f.age / f.life;
+      f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt; let kill = k >= 1;
+      if (!f.sm) {
+        f.vz += 40 * dt; f.vx *= 1 - 0.9 * dt; f.vy *= 1 - 0.9 * dt;
+        if (!kill && (f.z < 1 || f.z < bh(f.x, f.y))) kill = true;
+        f.m.material.color.setHSL(0.13 * (1 - k), 1, 0.58 - 0.25 * k); f.m.material.opacity = 0.95 * (1 - k * k); f.m.scale.setScalar(1.8 + k * 6.5);
+        if (kill && Math.random() < 0.55) flameSpawn(f.x, f.y, Math.max(2, f.z), rnd(-8, 8), rnd(-8, 8), rnd(26, 46), true);
+      } else { f.vz = Math.max(f.vz, 22); f.m.material.opacity = 0.5 * (1 - k); f.m.scale.setScalar(4 + k * 11); }
+      f.m.position.set(f.x, f.z, f.y);
+      if (kill) { sc.remove(f.m); f.m.material.dispose(); flp.splice(i, 1); }
+    }
+  }
+  function flameFire(dt) {
+    const w = WP[9], lv = MP.wlv(9), a = MP.aimA(), z0 = 9 + P.z + (P.jh || 0), cs = Math.cos(a), sn = Math.sin(a), R = 150 * (1 + 0.06 * lv);
+    flAcc += dt; while (flAcc >= 0.05 && am[9] > 0) { flAcc -= 0.05; am[9]--; } if (flAcc > 0.2) flAcc = 0;
+    heat = Math.min(5, heat + 0.5 * dt); shake = Math.max(shake, 1.2);
+    if (flp.length < 240) for (let n = 0; n < 3; n++) {
+      const aa = a + rnd(-0.07, 0.07), sp = rnd(380, 450);
+      flameSpawn(P.x + Math.cos(aa) * 14, P.y + Math.sin(aa) * 14, z0, Math.cos(aa) * sp, Math.sin(aa) * sp, MP.aimVz(sp, z0) + rnd(-6, 6), false);
+    }
+    const sl = MP.aimVz(100, z0) / 100;
+    const inCone = (x, y, r) => { const dx = x - P.x, dy = y - P.y, d = dx * cs + dy * sn; if (d < 0 || d > R) return false; return Math.abs(-dx * sn + dy * cs) < 10 + d * 0.2 + r; };
+    for (const p of peds) { if (p.dead > 0) continue; const q = pp(p); if (inCone(q[0], q[1], 6)) { p.flT = (p.flT || 0) + dt; if (p.flT > 0.3) { p.flT = 0; hitPed(p, true); } } }
+    for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o.dead > 0) continue; if (inCone(o.x, o.y, 8)) { o.hp -= 60 * (1 + 0.15 * lv) * dt; heat = Math.min(5, heat + 0.4 * dt); if (o.hp <= 0) killOff(j); } }
+    for (const c of cars) if (c !== P.car && inCone(c.x, c.y, 16) && Math.abs((c.z || 0) + 8 - z0) < 50) dmgCar(c, 28 * (1 + 0.15 * lv) * dt);
+    for (const d of [45, 85, 125, 150]) {
+      if (d > R) break;
+      const x = P.x + cs * d, y = P.y + sn * d, zz = z0 + sl * d, b = bAt(x, y);
+      if (b && b.h && !b.fire && !b.pg && !b.park && !b.lake && zz < b.h && solid(x, y, 0)) { b.bt = (b.bt || 0) + dt; if (b.bt > 0.9) { b.bt = 0; igniteBuilding(b); msg('🔥 건물에 불이 붙었어요!'); } break; }
+    }
+    flSnd -= dt; if (flSnd <= 0) { flSnd = 0.16; playSound('shoot'); }
+    flNet -= dt; if (flNet <= 0) { flNet = 0.12; MP.shot(P.x, P.y, z0, P.a, w.col, 2.4, 340); }
+    if (am[9] <= 0) { rel = w.rel; msg('⛽ 연료 소진 · 재장전'); }
+  }
+  function homeSteer(b, dt) {
+    let best = null, bd = 420;
+    const test = (x, y) => { const dx = x - b.x, dy = y - b.y, d = Math.hypot(dx, dy); if (d > 1 && d < bd && (dx * b.dx + dy * b.dy) / d > 0.55) { bd = d; best = [x, y]; } };
+    for (const c of cars) if (c.type === 'c') test(c.x, c.y);
+    for (const o of offs) if (o.dead <= 0) test(o.x, o.y);
+    if (!best) return;
+    const cur = Math.atan2(b.dy, b.dx), da = angN(Math.atan2(best[1] - b.y, best[0] - b.x) - cur), st = Math.max(-3.2 * dt, Math.min(3.2 * dt, da));
+    b.dx = Math.cos(cur + st); b.dy = Math.sin(cur + st);
+  }
+  function plasmaPop(x, y, skip) {
+    const ring = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 10), new THREE.MeshBasicMaterial({ color: 0x3dffb0, transparent: true, opacity: 0.7 }));
+    ring.position.set(x, 9, y); sc.add(ring); fx.push({ x, y, t: 0.7, r: 45, m: ring });
+    for (const p of peds) { if (p.dead > 0 || p === skip) continue; const q = pp(p); if (Math.hypot(q[0] - x, q[1] - y) < 45) hitPed(p, true); }
+    for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o === skip || o.dead > 0) continue; if (Math.hypot(o.x - x, o.y - y) < 45) { o.hp -= 40; if (o.hp <= 0) killOff(j); } }
+    for (const c of cars) if (c !== skip && c !== P.car && Math.hypot(c.x - x, c.y - y) < 45) dmgCar(c, 30);
+    playSound('boom');
+  }
+  const bdm = b => b.fall ? b.d * (0.35 + 0.85 * Math.max(0, b.t) / b.t0) : b.d;
+  function pierceOk(b, t) { if (!(b.pr > 0)) return false; b.pr--; (b.ig || (b.ig = new Set())).add(t); if (b.pls) plasmaPop(b.x, b.y, t); return true; }
+  const wmsg = i => msg(WP[i].n + (WP[i].tip ? ' · ' + WP[i].tip : ''));
+
   function igniteNearbyBuilding() {
     const b=bAt(P.x+Math.cos(P.a)*90,P.y+Math.sin(P.a)*90) || bAt(P.x,P.y);
     if(!b || !b.h || b.fire || Math.hypot(P.x-b.cx,P.y-b.cz)>230) {msg('건물 가까이에서 [7] 라이터 사용');return;}
+    igniteBuilding(b);
+  }
+  function igniteBuilding(b) {
     b.fire=true; const flame=new THREE.Group();
     for(let n=0;n<14;n++){
       const h=rnd(20,45),m=new THREE.Mesh(new THREE.ConeGeometry(rnd(4,11),h,6),
@@ -1798,18 +1865,20 @@
     if (tased > 0) tased -= dt;
     const tf = slow ? 2.8 : 1; cd -= dt * tf; dcd -= dt * tf; gcd -= dt * tf; tcd -= dt * tf;
     if (rel > 0) { rel -= dt * tf; if (rel <= 0) { am[wi] = WP[wi].mag; msg('장전 완료'); } }
+    spinV = Math.max(0, spinV - dt * 1.6);
+    if (P.onFoot && WP[wi].flame && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && rel <= 0 && am[wi] > 0) flameFire(dt);
 
-    if (P.onFoot && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && cd <= 0 && rel <= 0) {
+    if (P.onFoot && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && cd <= 0 && rel <= 0 && !WP[wi].flame) {
       const w = WP[wi];
       if (am[wi] > 0) {
-        am[wi]--; const wlv = MP.wlv(wi); cd = w.cd * (1 - 0.025 * wlv); heat = Math.min(5, heat + w.h); shake = Math.max(shake, w.k);
-        w.mat = w.mat || new THREE.MeshBasicMaterial({ color: w.col });
+        am[wi]--; const wlv = MP.wlv(wi); const crit = w.crit && (++pcnt % 3 === 0); if (w.spin) { cd = w.cd * (1 + (w.spin - 1) * (1 - spinV)) * (1 - 0.025 * wlv); spinV = Math.min(1, spinV + 1 / w.rampN); } else cd = w.cd * (1 - 0.025 * wlv); heat = Math.min(5, heat + w.h); shake = Math.max(shake, w.k);
+        w.mat = w.mat || new THREE.MeshBasicMaterial({ color: w.col }); w.cmat = w.cmat || new THREE.MeshBasicMaterial({ color: 0xff3030 });
         for (let n = 0; n < w.pel; n++) {
-          const a = MP.aimA() + rnd(-w.sp, w.sp) * (aim ? 0.3 : 1), bm = new THREE.Mesh(bulG, w.mat);
-          bm.scale.setScalar(w.sz); bm.position.set(P.x + Math.cos(a) * 12, 9 + P.z, P.y + Math.sin(a) * 12); sc.add(bm);
-          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * (1 + 0.15 * wlv), w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z) });
+          const a = MP.aimA() + rnd(-w.sp, w.sp) * (aim ? 0.3 : 1), bm = new THREE.Mesh(bulG, crit ? w.cmat : w.mat);
+          bm.scale.setScalar(crit ? w.sz * 2 : w.sz); bm.position.set(P.x + Math.cos(a) * 12, 9 + P.z, P.y + Math.sin(a) * 12); sc.add(bm);
+          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * (1 + 0.15 * wlv) * (crit ? 2.2 : 1), w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z), t0: w.life, pr: w.pr || 0, pls: w.pls || 0, home: w.home || 0, thru: w.thru || 0, fall: w.fall || 0 });
         }
-        playSound('shoot'); MP.shot(P.x, P.y, 9 + P.z + (P.jh || 0), P.a, w.col, w.sz, w.v);
+        if (!w.q) playSound('shoot'); if (crit) msg('💥 치명타!'); MP.shot(P.x, P.y, 9 + P.z + (P.jh || 0), P.a, crit ? 0xff3030 : w.col, w.sz, w.v);
         if (w.hs) snipe();
         if (am[wi] === 0) rel = w.rel;
       } else rel = w.rel;
@@ -1896,37 +1965,39 @@
       z.m.position.set(z.x, 9, z.y); if (dead) { sc.remove(z.m); tz.splice(i, 1); }
     }
 
-    collide(); jackUpd(dt, tg); fireResponse(dt);
+    collide(); jackUpd(dt, tg); fireResponse(dt); flameUpd(dt);
     for (const j of jets) j.scale.y = 0.75 + Math.abs(Math.sin(T * 4)) * 0.4;
     for (const f of foam) { f.ph += dt * 0.9; const o = Math.sin(f.ph) * 26; f.m.position.x = f.bx + f.nx * o; f.m.position.z = f.bz + f.nz * o; f.m.material.opacity = 0.3 + Math.abs(Math.cos(f.ph)) * 0.3; }
     for (const s of sees) s.rotation.z = Math.sin(T * 1.3 + s.userData.ph) * 0.3;
     if (vb.ball) { const u = (T * 0.55) % 2, toward = u < 1 ? 1 : -1, k = u % 1; vb.ball.position.set(vb.x + Math.sin(T * 0.9) * 14, 14 + Math.sin(k * Math.PI) * 48, vb.y + toward * (-55 + 110 * k)); }
 
     for (let i = bul.length - 1; i >= 0; i--) {
-      const b = bul[i]; b.t -= dt; b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
+      const b = bul[i]; b.t -= dt; if (b.home) homeSteer(b, dt); b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
       if (b.vz) b.z += b.vz * dt;
-      let dead = b.t <= 0 || !inW(b.x, b.y) || b.z < bh(b.x, b.y) || (b.vz && b.z < 2);
+      let dead = b.t <= 0 || !inW(b.x, b.y) || (!b.thru && b.z < bh(b.x, b.y)) || (b.vz && b.z < 2);
       if (!dead) for (const c of cars) {
-        if (c !== P.car && Math.hypot(c.x - b.x, c.y - b.y) < 22 && Math.abs((c.z || 0) + 8 - b.z) < 45) {
+        if (c !== P.car && !(b.ig && b.ig.has(c)) && Math.hypot(c.x - b.x, c.y - b.y) < 22 && Math.abs((c.z || 0) + 8 - b.z) < 45) {
           dead = true; if (b.w === 4) { if (c.type === 'c') c.stun = 4; else c.stall = 4; c.v *= 0.2; }
-          else if (!WP[b.w].rk) { dmgCar(c, b.d); heat = Math.min(5, heat + 0.3); }
+          else if (!WP[b.w].rk) { dmgCar(c, bdm(b)); heat = Math.min(5, heat + (WP[b.w].q ? 0 : 0.3)); }
+          if (pierceOk(b, c)) dead = false;
           break;
         }
       }
       if (!dead) for (const p of peds) {
         if (p.dead > 0) continue; const q = pp(p);
-        if (Math.hypot(q[0] - b.x, q[1] - b.y) < 12) { dead = true; hitPed(p, b.w !== 4); break; }
+        if (Math.hypot(q[0] - b.x, q[1] - b.y) < 12 && !(b.ig && b.ig.has(p))) { dead = true; hitPed(p, b.w !== 4); if (pierceOk(b, p)) dead = false; break; }
       }
       if (!dead) for (let j = offs.length - 1; j >= 0; j--) {
         const o = offs[j]; if (o.dead > 0) continue;
-        if (Math.hypot(o.x - b.x, o.y - b.y) < 12) {
+        if (Math.hypot(o.x - b.x, o.y - b.y) < 12 && !(b.ig && b.ig.has(o))) {
           dead = true; if (b.w === 4) { o.dead = 4; o.m.rotation.z = Math.PI / 2; }
-          else if (!WP[b.w].rk) { o.hp -= b.d; heat = Math.min(5, heat + 0.3); if (o.hp <= 0) killOff(j); }
+          else if (!WP[b.w].rk) { o.hp -= bdm(b); heat = Math.min(5, heat + (WP[b.w].q ? 0 : 0.3)); if (o.hp <= 0) killOff(j); }
+          if (pierceOk(b, o)) dead = false;
           break;
         }
       }
       if (!dead && MP.bulletHit(b)) dead = true;
-      if (dead && WP[b.w].rk) boom(b.x, b.y, b.w === 11 ? 80 : 95, b.w === 11 ? 85 : 100);
+      if (dead && WP[b.w].rk) { boom(b.x, b.y, b.w === 11 ? 80 : 95, b.w === 11 ? 85 : 100); if (WP[b.w].clu) for (let k = 0; k < 3; k++) { const aa = k * 2.094 + Math.random(); boom(b.x + Math.cos(aa) * 55, b.y + Math.sin(aa) * 55, 55, 60); } }
       b.m.position.set(b.x, b.z, b.y); if (dead) { sc.remove(b.m); bul.splice(i, 1); }
     }
 
@@ -2080,7 +2151,7 @@
     }
 
     if (P.onFoot) {
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.fillText((rel > 0 ? '장전 중... ' : '') + WP[wi].n + (MP.wlv(wi) ? ' +' + MP.wlv(wi) : '') + '  ' + am[wi] + '/' + WP[wi].mag, 16, 78);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.fillText((rel > 0 ? '장전 중... ' : '') + WP[wi].n + (MP.wlv(wi) ? ' +' + MP.wlv(wi) : '') + (WP[wi].spin ? '  🔥예열 ' + Math.round(spinV * 100) + '%' : '') + '  ' + am[wi] + '/' + WP[wi].mag, 16, 78);
       ctx.font = '16px system-ui'; ctx.fillText('[F] 대시 ' + (dcd > 0 ? dcd.toFixed(1) + 's' : '준비') + '   ·   U 상점 · Tab 플레이어 · M 지도 · P 마우스', 16, 102);
     }
 
@@ -2554,11 +2625,11 @@
       if (!sb) {
         if (!window.supabase) { status = '오프라인 (싱글플레이)'; refreshUI(); return; }
         sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 30 } } });
-        setTimeout(loadProfile, 0);
+        setTimeout(() => { if (skipProf) skipProf = false; else loadProfile(); }, 0);
       }
       const c = sb.channel('crimecity4:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
       ch = c;
-      const on = (ev, fn) => c.on('broadcast', { event: ev }, ({ payload: d }) => { if (c === ch && d && d.id !== myId) fn(d); });
+      const on = (ev, fn) => c.on('broadcast', { event: ev }, ({ payload: d }) => { if (c === ch && d && d.id !== myId) { lastRx = performance.now(); fn(d); } });
       on('s', d => applyState(ensure(d.id, d), d));
       on('shot', remoteShot);
       on('boom', remoteBoom);
@@ -2596,6 +2667,7 @@
         if (c !== ch) return;
         if (s === 'SUBSCRIBED') {
           status = code === myCode ? '온라인 · 친구에게 방 코드를 알려주세요' : '친구 방 접속 완료';
+          rcN = 0; lastRx = performance.now(); vanTried = false;
           await c.track({ id: myId, name: myName, color: myColor });
           lastSent = ''; sendT = 0;
           if (code !== myCode) { addFeed(`방 ${code} 에 참가했습니다`, '#7bd44a'); event('님이 합류했습니다'); }
@@ -2990,7 +3062,7 @@
     // ---------------------------------------------------------------- 상점 (U)
     const own = (() => { try { return JSON.parse(LS.get('cc_own') || '{}'); } catch (e) { return {}; } })();
     let god = 0, jumpT = 0, spdT = 0, shopOpen = false, myAura = null;
-    function selW(i) { if (!P.onFoot || (i >= 6 && !own[i])) return; wi = i; rel = 0; scope = false; msg(WP[i].n); }
+    function selW(i) { if (!P.onFoot || (i >= 6 && !own[i])) return; wi = i; rel = 0; scope = false; wmsg(i); }
     function cycleSpecial() {
       const list = [6, 7, 8, 9, 10, 11, 12, 13].filter(i => own[i]); if (!list.length) { msg('특수 무기가 없어요 · U 상점에서 구매'); return; }
       const n = list.indexOf(wi); selW(list[(n + 1) % list.length]);
@@ -3011,7 +3083,8 @@
       { id: 'god', ic: '🛡️', n: '무적 포션', d: '30초간 체포·테이저·차량 피해 무효', p: 8000 },
       { id: 'spd', ic: '💨', n: '스피드 포션', d: '30초간 걷기·달리기 2배', p: 4000 },
       { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 옥상까지 점프 · 낙하 충격 없음', p: 3000 },
-      { id: 'jp', ic: '🎒', n: '제트팩', d: '공중에서 Space 꾹 → 비행 · 연료 자동 충전 (영구)', p: 20000, perm: 'jp' },
+      { id: 'jp', ic: '🎒', n: '제트팩', d: '공중에서 Space 꾹 → 비행 · 연료 자동 충전 (영구)', p: 300000, perm: 'jp' },
+      { id: 'gh', ic: '🪝', n: '그래플링 훅', d: 'C 키: 조준한 건물·벽으로 끌려가기 (영구)', p: 150000, perm: 'gh' },
       { id: 'jpu', ic: '⛽', get n() { return '제트팩 연료 업그레이드 Lv' + (own.jpu || 0) + '/5'; }, get d() { return own.jp ? '연료 용량 ' + jpMax() + ' → ' + (jpMax() + 50) + ' · 충전 속도 증가' : '먼저 제트팩을 구매하세요'; }, get p() { return JPU[Math.min(own.jpu || 0, 4)]; }, mx: () => (own.jpu || 0) >= 5 },
       { id: 'gren', ic: '💣', n: '수류탄 ×5', d: '8 / G로 투척', p: 1500 },
       { id: 'tnt', ic: '🧨', n: 'TNT ×3', d: '9 / T로 설치', p: 2500 },
@@ -3045,7 +3118,7 @@
       $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString();
       $('shopGr').innerHTML = ITEMS.map(it => {
         const ow = (it.w && own[it.w]) || (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && money < it.p;
-        return `<div class="it${ow ? ' own' : no ? ' no' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : '보유 중') : '$' + it.p.toLocaleString()}</div></div>`;
+        return `<div class="it${ow ? ' own' : no ? ' no' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : '보유 중') : '$' + it.p.toLocaleString()}</div></div>`;
       }).join('');
     }
     shopEl.addEventListener('click', e => { const t = e.target.closest('.it'); if (t) buy(t.dataset.id); });
@@ -3071,7 +3144,7 @@
       if (money < it.p) { msg(`돈이 부족해요 ($${(it.p - Math.round(money)).toLocaleString()} 더 필요)`); playSound('shoot'); return; }
       money -= it.p; playSound('cash');
       if (it.w) { own[it.w] = 1; LS.set('cc_own', JSON.stringify(own)); am[it.w] = WP[it.w].mag; if (P.onFoot) { wi = it.w; rel = 0; scope = false; } event(`님이 ${it.n}을(를) 샀습니다!`); }
-      else if (it.perm) { own[it.perm] = 1; LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg('🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요'); }
+      else if (it.perm) { own[it.perm] = 1; LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg(it.perm === 'gh' ? '🪝 그래플링 훅 획득! 건물을 조준하고 C' : '🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요'); }
       else if (id === 'god') { god = 30; event('님이 무적 포션을 마셨습니다 (30초)'); }
       else if (id === 'spd') spdT = 30;
       else if (id === 'jmp') jumpT = 30;
@@ -3266,6 +3339,35 @@
     function boomEv(x, y, r, dmg) { send('boom', { x: Math.round(x), y: Math.round(y), r: Math.round(r), dmg: Math.round(dmg || 100) }); }
     function loot(text, amount) { event(text, { loot: amount, x: Math.round(P.x), y: Math.round(P.y) }); }
 
+
+    // ---------------------------------------------------------------- 자동 재접속 (모두 나간 것처럼 뜨는 끊김 복구)
+    let lastRx = performance.now(), rcAt = 0, rcN = 0, skipProf = false, prevSize = 0, vanAt = 0, vanTried = false, hidAt = 0;
+    function reconnect(why) {
+      if (!window.supabase || !room) return;
+      rcAt = performance.now(); rcN = Math.min(rcN + 1, 4); vanTried = true;
+      try { saveProfile(true); } catch (e) {}
+      try { if (ch && sb) sb.removeChannel(ch); } catch (e) {} ch = null;
+      try { if (sb) sb.removeAllChannels(); } catch (e) {}
+      sb = null; skipProf = true; lastRx = performance.now();
+      addFeed('🔄 ' + why + ' → 같은 방 코드로 자동 재접속 중...', '#7fd');
+      go(room);
+    }
+    setInterval(() => {
+      if (!room || document.hidden || !window.supabase) return;
+      const now = performance.now(), n = remotes.size;
+      if (n > 0) { vanTried = false; vanAt = 0; } else if (prevSize > 0) vanAt = now;
+      prevSize = n;
+      if (now - rcAt < Math.min(30000, 3000 * Math.pow(2, rcN))) return;
+      if (/끊김|오프라인/.test(status) && now - rcAt > 5000) return reconnect('연결이 끊겼어요');
+      if (n > 0 && now - lastRx > 9000) return reconnect('친구 신호가 끊겼어요');
+      if (n === 0 && vanAt && !vanTried && now - vanAt > 1500 && now - vanAt < 12000) return reconnect('친구가 한꺼번에 사라졌어요');
+    }, 2000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { hidAt = performance.now(); return; }
+      if (hidAt && performance.now() - hidAt > 15000 && room) { rcN = 0; rcAt = 0; reconnect('백그라운드에서 돌아왔어요'); }
+    });
+    window.addEventListener('online', () => { if (room) { rcN = 0; rcAt = 0; reconnect('인터넷이 다시 연결됐어요'); } });
+
     // ================================================================ v4 시스템 (차 가게 · 차키 · 안내 화살표 · 웨이포인트 · 그래플링 · 강화소)
     own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0;
     const ownCar = new Map();               // 차 id → 실제 차량 객체
@@ -3453,6 +3555,7 @@
     // ---------------------------------------------------------------- 그래플링 훅 (C)
     let rope = null, hookM = null;
     function hook() {
+      if (!own.gh) { msg('🪝 그래플링 훅은 U 상점에서 $150,000에 살 수 있어요'); return; }
       if (!P.onFoot || P.ride || P.climb || activeInterior || jk || tased > 0) return;
       if (P.gh) { P.gh = null; P.air = 1; P.vzj = 80; return; }
       if (T < ghCd) return;
