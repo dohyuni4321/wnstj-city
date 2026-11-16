@@ -472,7 +472,12 @@
     { n: '플라즈마 라이플', mag: 24, cd: 0.14, dmg: 55, pel: 1, sp: 0.01, rel: 2.0, v: 1300, life: 1, h: 0.12, k: 1.8, col: 0x3dffb0, sz: 1.5, len: 2.6, pr: 2, pls: 1, tip: '관통 + 맞을 때마다 폭발파' },
     { n: '유탄발사기', mag: 6, cd: 0.7, dmg: 80, pel: 1, sp: 0, rel: 2.6, v: 520, life: 1.4, h: 0.45, k: 4, col: 0xb8ff3c, sz: 2, len: 2.2, rk: 1, clu: 1, tip: '폭발 후 파편이 3번 더 터짐' },
     { n: '석궁', mag: 8, cd: 0.7, dmg: 150, pel: 1, sp: 0, rel: 1.6, v: 1500, life: 1.1, h: 0.01, k: 1, col: 0xd8b98a, sz: 0.9, len: 2, pr: 3, q: 1, tip: '소음 없음 · 3명 관통' },
-    { n: '레이저 소총', mag: 80, cd: 0.05, dmg: 16, pel: 1, sp: 0.005, rel: 2.2, v: 2200, life: 0.7, h: 0.08, k: 0.6, col: 0xff2e5a, sz: 1.1, len: 2.8, pr: 99, spin: 1.5, rampN: 10, tip: '전부 관통 · 쏠수록 빨라짐' }
+    { n: '레이저 소총', mag: 80, cd: 0.05, dmg: 16, pel: 1, sp: 0.005, rel: 2.2, v: 2200, life: 0.7, h: 0.08, k: 0.6, col: 0xff2e5a, sz: 1.1, len: 2.8, pr: 99, spin: 1.5, rampN: 10, tip: '전부 관통 · 쏠수록 빨라짐' },
+    { n: '번개총', mag: 14, cd: 0.38, dmg: 40, pel: 1, sp: 0, rel: 1.8, v: 1600, life: 0.6, h: 0.2, k: 1.5, col: 0x7ad7ff, sz: 1.4, len: 2.4, chain: 1, tip: '맞으면 주변 3명에게 번개가 튐' },
+    { n: '회전톱', mag: 10, cd: 0.5, dmg: 45, pel: 1, sp: 0, rel: 1.6, v: 650, life: 1.8, h: 0.1, k: 1, col: 0xd0d6dd, sz: 2.2, len: 1.6, bmr: 1, pr: 999, tip: '날아갔다가 돌아오며 두 번 벰 · 관통' },
+    { n: '블랙홀 건', mag: 3, cd: 1.2, dmg: 0, pel: 1, sp: 0, rel: 3, v: 360, life: 1.2, h: 0.6, k: 3, col: 0x8a3cff, sz: 3, len: 2.4, hole: 1, tip: '3초간 차·경찰·시민을 빨아들이고 폭발' },
+    { n: '네이팜탄', mag: 5, cd: 0.8, dmg: 30, pel: 1, sp: 0.02, rel: 2.4, v: 520, life: 1.3, h: 0.5, k: 3, col: 0xff8a2a, sz: 2, len: 2.2, nap: 1, tip: '떨어진 곳이 6초간 불바다 · 건물에 불이 붙음' },
+    { n: '텔레포트 건', mag: 6, cd: 0.6, dmg: 0, pel: 1, sp: 0, rel: 1.8, v: 1400, life: 0.5, h: 0, k: 0.5, col: 0x3dffe0, sz: 1.6, len: 2, tp: 1, q: 1, tip: '탄이 닿은 곳으로 순간이동' }
   ], am = WP.map(w => w.mag);
 
   const pp = p => p.beach ? [p.x, p.y] : [p.h ? p.t : p.k * B + p.off, p.h ? p.k * B + p.off : p.t];
@@ -496,6 +501,7 @@
       if (!hit) for (let j = offs.length - 1; j >= 0; j--) {
         const o = offs[j]; if (o.dead <= 0 && Math.hypot(o.x - x, o.y - y) < 9) { o.hp -= 140 * (1 + 0.15 * MP.wlv(5)); if (o.hp <= 0) killOff(j); hit = true; break; }
       }
+      if (!hit && MP.pvpRay(x, y, z, 140 * (1 + 0.15 * MP.wlv(5)))) hit = true;
       if (hit) { L = s * 6; break; }
     }
     const m = bx(L, 0.5, 0.5, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
@@ -1145,7 +1151,7 @@
       else {
         robbing.t += dt; heat = Math.max(heat, rt(r).h);
         if (robbing.t >= robbing.d) {
-          const g = Math.round(rnd(rt(r).min, rt(r).max));
+          const g = Math.round(rnd(rt(r).min, rt(r).max) * (MP.has('bag') ? 1.3 : 1));
           money += g; heat = Math.min(5, heat + rt(r).hs); r.cool = r.k === 'a' ? 90 : 150; robbing = null;
           msg('💰 ' + rt(r).n + ' 강탈 성공! +$' + g.toLocaleString()); playSound('cash'); MP.loot(rt(r).n + ' 강탈 성공! +$' + g.toLocaleString() + ' (근처 팀원 30% 보너스)', g);
         }
@@ -1549,6 +1555,7 @@
     for (const p of peds) { if (p.dead > 0) continue; const q = pp(p); if (inCone(q[0], q[1], 6)) { p.flT = (p.flT || 0) + dt; if (p.flT > 0.3) { p.flT = 0; hitPed(p, true); } } }
     for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o.dead > 0) continue; if (inCone(o.x, o.y, 8)) { o.hp -= 60 * (1 + 0.15 * lv) * dt; heat = Math.min(5, heat + 0.4 * dt); if (o.hp <= 0) killOff(j); } }
     for (const c of cars) if (c !== P.car && inCone(c.x, c.y, 16) && Math.abs((c.z || 0) + 8 - z0) < 50) dmgCar(c, 28 * (1 + 0.15 * lv) * dt);
+    MP.pvpCone(inCone, dt, lv);
     for (const d of [45, 85, 125, 150]) {
       if (d > R) break;
       const x = P.x + cs * d, y = P.y + sn * d, zz = z0 + sl * d, b = bAt(x, y);
@@ -1576,8 +1583,84 @@
     playSound('boom');
   }
   const bdm = b => b.fall ? b.d * (0.35 + 0.85 * Math.max(0, b.t) / b.t0) : b.d;
-  function pierceOk(b, t) { if (!(b.pr > 0)) return false; b.pr--; (b.ig || (b.ig = new Set())).add(t); if (b.pls) plasmaPop(b.x, b.y, t); return true; }
+  function pierceOk(b, t) { if (b.chain) arcChain(b, t); if (!(b.pr > 0)) return false; b.pr--; (b.ig || (b.ig = new Set())).add(t); if (b.pls) plasmaPop(b.x, b.y, t); return true; }
   const wmsg = i => msg(WP[i].n + (WP[i].tip ? ' · ' + WP[i].tip : ''));
+  const SPW = []; for (let i = 6; i < WP.length; i++) SPW.push(i);
+  const tpos = t => peds.includes(t) ? pp(t) : (t.tx !== undefined ? [t.tx, t.ty] : [t.x, t.y]);
+  function bolt(a, c) {
+    const pts = []; for (let i = 0; i <= 5; i++) { const k = i / 5, j = i && i < 5; pts.push(new THREE.Vector3(a[0] + (c[0] - a[0]) * k + (j ? rnd(-6, 6) : 0), 12 + (j ? rnd(-4, 4) : 0), a[1] + (c[1] - a[1]) * k + (j ? rnd(-6, 6) : 0))); }
+    const m = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 1 })); sc.add(m); trc.push({ m, t: 0.15 });
+  }
+  function arcChain(b, t) {
+    const q = tpos(t), cand = [];
+    for (const p of peds) { if (p.dead > 0 || p === t) continue; const u = pp(p), d = Math.hypot(u[0] - q[0], u[1] - q[1]); if (d < 150) cand.push({ d, u, k: 'p', o: p }); }
+    for (const o of offs) { if (o.dead > 0 || o === t) continue; const d = Math.hypot(o.x - q[0], o.y - q[1]); if (d < 150) cand.push({ d, u: [o.x, o.y], k: 'o', o }); }
+    for (const c of cars) { if (c === t || c === P.car || c.disp || c.type !== 'c') continue; const d = Math.hypot(c.x - q[0], c.y - q[1]); if (d < 150) cand.push({ d, u: [c.x, c.y], k: 'c', o: c }); }
+    cand.sort((a, c) => a.d - c.d); let prev = q;
+    for (const e of cand.slice(0, 3)) {
+      bolt(prev, e.u);
+      if (e.k === 'p') hitPed(e.o, true); else if (e.k === 'o') { e.o.hp -= 40 * (1 + 0.15 * MP.wlv(14)); if (e.o.hp <= 0) { const j = offs.indexOf(e.o); if (j >= 0) killOff(j); } } else dmgCar(e.o, 35);
+      prev = e.u;
+    }
+    MP.pvpRad(q[0], q[1], 150, 25, 14);
+  }
+  function bmrStep(b, dt) {
+    if (!b.rev && b.t < b.t0 * 0.55) { b.rev = 1; b.ig = null; b.pr = 999; }
+    if (!b.rev) return;
+    const dx = P.x - b.x, dy = P.y - b.y, d = Math.hypot(dx, dy);
+    if (d < 24) { b.t = 0; return; }
+    b.dx = dx / d; b.dy = dy / d; b.v = 900; b.vz = 0; b.z += (9 + P.z - b.z) * Math.min(1, 6 * dt); b.t = Math.max(b.t, 0.05);
+  }
+  const wells = [], naps = [];
+  function wellAdd(x, y) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 12), new THREE.MeshBasicMaterial({ color: 0x14001f }));
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(1, 0.1, 8, 28), new THREE.MeshBasicMaterial({ color: 0xa65cff, transparent: true, opacity: 0.85 }));
+    m.position.set(x, 14, y); rg.position.set(x, 14, y); sc.add(m); sc.add(rg); wells.push({ x, y, t: 3, m, rg }); playSound('boom'); msg('🕳️ 블랙홀 생성!');
+  }
+  function wellUpd(dt) {
+    for (let i = wells.length - 1; i >= 0; i--) {
+      const w = wells[i]; w.t -= dt; const k = Math.min(1, (3 - w.t) / 0.4);
+      w.m.scale.setScalar(14 * k * (1 + Math.sin(T * 14) * 0.08)); w.rg.rotation.set(Math.PI / 2, 0, T * 5); w.rg.scale.setScalar(42 * k + Math.sin(T * 9) * 3);
+      for (const c of cars) {
+        if (c === P.car || c.disp || c.type === 'p') continue;
+        const dx = w.x - c.x, dy = w.y - c.y, d = Math.hypot(dx, dy); if (d > 320 || d < 1) continue;
+        const mv = (90 + 300 * (1 - d / 320)) * dt, nx = c.x + dx / d * mv, ny = c.y + dy / d * mv;
+        if (!solid(nx, c.y, 21)) c.x = nx; if (!solid(c.x, ny, 21)) c.y = ny; c.v *= 0.97; if (d < 45) dmgCar(c, 70 * dt);
+      }
+      for (let j = offs.length - 1; j >= 0; j--) {
+        const o = offs[j]; if (o.dead > 0) continue; const dx = w.x - o.x, dy = w.y - o.y, d = Math.hypot(dx, dy); if (d > 320 || d < 1) continue;
+        const mv = (70 + 260 * (1 - d / 320)) * dt, nx = o.x + dx / d * mv, ny = o.y + dy / d * mv;
+        if (!solid(nx, o.y, 6)) o.x = nx; if (!solid(o.x, ny, 6)) o.y = ny; if (d < 40) { o.hp -= 80 * dt; if (o.hp <= 0) killOff(j); }
+      }
+      for (const p of peds) { if (p.dead > 0) continue; const u = pp(p); if (Math.hypot(u[0] - w.x, u[1] - w.y) < 60) { p.wT = (p.wT || 0) + dt; if (p.wT > 0.25) { p.wT = 0; hitPed(p, true); } } }
+      MP.pvpCone((x, y, r) => Math.hypot(x - w.x, y - w.y) < 70 + r, dt, 0);
+      if (w.t <= 0) { sc.remove(w.m); sc.remove(w.rg); wells.splice(i, 1); boom(w.x, w.y, 80, 70); }
+    }
+  }
+  function napAdd(x, y) { naps.push({ x, y, t: 6 }); playSound('boom'); msg('🔥 네이팜 투하!'); }
+  function napUpd(dt) {
+    for (let i = naps.length - 1; i >= 0; i--) {
+      const n = naps[i]; n.t -= dt;
+      if (flp.length < 230) for (let k = 0; k < 2; k++) { const a = Math.random() * 6.283, rr = Math.random() * 62; flameSpawn(n.x + Math.cos(a) * rr, n.y + Math.sin(a) * rr, 3, rnd(-10, 10), rnd(-10, 10), rnd(80, 140), false); }
+      for (const p of peds) { if (p.dead > 0) continue; const u = pp(p); if (Math.hypot(u[0] - n.x, u[1] - n.y) < 70) { p.nT = (p.nT || 0) + dt; if (p.nT > 0.4) { p.nT = 0; hitPed(p, true); } } }
+      for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o.dead > 0) continue; if (Math.hypot(o.x - n.x, o.y - n.y) < 70) { o.hp -= 45 * dt; if (o.hp <= 0) killOff(j); } }
+      for (const c of cars) if (c !== P.car && !c.disp && Math.hypot(c.x - n.x, c.y - n.y) < 75) dmgCar(c, 25 * dt);
+      MP.pvpCone((x, y, r) => Math.hypot(x - n.x, y - n.y) < 70 + r, dt, 0);
+      for (let k = 0; k < 4; k++) {
+        const a = k * 1.571, x = n.x + Math.cos(a) * 62, y = n.y + Math.sin(a) * 62, b = bAt(x, y);
+        if (b && b.h && !b.fire && !b.pg && !b.park && !b.lake && solid(x, y, 0)) { b.bt = (b.bt || 0) + dt; if (b.bt > 1.5) { b.bt = 0; igniteBuilding(b); msg('🔥 건물에 불이 붙었어요!'); } break; }
+      }
+      if (n.t <= 0) naps.splice(i, 1);
+    }
+  }
+  function tpShot(b) {
+    if (activeInterior || P.climb || !P.onFoot) return;
+    let x = b.x - b.dx * 12, y = b.y - b.dy * 12;
+    for (let k = 0; k < 20 && solid(x, y, 8); k++) { x -= b.dx * 8; y -= b.dy * 8; }
+    if (solid(x, y, 8) || !inW(x, y)) { msg('여기로는 이동할 수 없어요'); return; }
+    P.x = x; P.y = y; P.z = 0; P.roof = null; P.air = 0; P.gh = null; shake = Math.max(shake, 5);
+    const ring = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 10), new THREE.MeshBasicMaterial({ color: 0x3dffe0, transparent: true, opacity: 0.7 })); ring.position.set(x, 9, y); sc.add(ring); fx.push({ x, y, t: 0.7, r: 40, m: ring });
+  }
 
   function igniteNearbyBuilding() {
     const b=bAt(P.x+Math.cos(P.a)*90,P.y+Math.sin(P.a)*90) || bAt(P.x,P.y);
@@ -1728,6 +1811,7 @@
 
   function drive(c, thr, st, dt, max) {
     c.bc = (c.bc || 0) - dt;
+    if (c === P.car && MP.nitro()) { max *= 1.4; thr *= 1.25; }
     if (c === P.car) {
       if (c.fuel === undefined) c.fuel = 60 + Math.random() * 40;
       if (c.fuel <= 0) { thr = 0; max = Math.min(max, 70); if (!c.fz) { c.fz = 1; msg('⛽ 연료가 다 떨어졌어요! 주유소(⛽)에서 F키 · $500'); } }
@@ -1843,7 +1927,7 @@
   function busted() {
     if (MP.god()) { bust = 0; return; }
     jk = null; for (const d of dvs) sc.remove(d.m); dvs.length = 0;
-    const loss = Math.floor(money * 0.3); money -= loss; msg('체포됨! 벌금 -$' + loss); MP.busted(loss);
+    const loss = Math.floor(money * (MP.has('vest') ? 0.15 : 0.3)); money -= loss; msg('체포됨! 벌금 -$' + loss); MP.busted(loss);
     for (let i = cars.length - 1; i >= 0; i--) if (cars[i].type === 'c' || cars[i] === P.car) cars.splice(i, 1);
     for (const o of offs) sc.remove(o.m); offs.length = 0;
     for (const z of tz) sc.remove(z.m); tz.length = 0;
@@ -1876,7 +1960,7 @@
         for (let n = 0; n < w.pel; n++) {
           const a = MP.aimA() + rnd(-w.sp, w.sp) * (aim ? 0.3 : 1), bm = new THREE.Mesh(bulG, crit ? w.cmat : w.mat);
           bm.scale.setScalar(crit ? w.sz * 2 : w.sz); bm.position.set(P.x + Math.cos(a) * 12, 9 + P.z, P.y + Math.sin(a) * 12); sc.add(bm);
-          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * (1 + 0.15 * wlv) * (crit ? 2.2 : 1), w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z), t0: w.life, pr: w.pr || 0, pls: w.pls || 0, home: w.home || 0, thru: w.thru || 0, fall: w.fall || 0 });
+          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * (1 + 0.15 * wlv) * (crit ? 2.2 : 1), w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z), t0: w.life, pr: w.pr || 0, pls: w.pls || 0, home: w.home || 0, thru: w.thru || 0, fall: w.fall || 0, chain: w.chain || 0, bmr: w.bmr || 0 });
         }
         if (!w.q) playSound('shoot'); if (crit) msg('💥 치명타!'); MP.shot(P.x, P.y, 9 + P.z + (P.jh || 0), P.a, crit ? 0xff3030 : w.col, w.sz, w.v);
         if (w.hs) snipe();
@@ -1891,7 +1975,7 @@
         if (P.z <= 0) {
           P.z = 0; P.climb = 0; let g = 0;
           while (solid(P.x, P.y, 6) && g++ < 40) { P.x += Math.sign(P.fx) * 4; P.y += Math.sign(P.fy) * 4; }
-          if (P.z0 > 110) { tased = Math.min(2.5, P.z0 / 80); shake = 10; msg('착지 충격!'); }
+          if (P.z0 > 110 && !MP.has('chute')) { tased = Math.min(2.5, P.z0 / 80); shake = 10; msg('착지 충격!'); }
         }
       }
       if (P.climb === 1) {
@@ -1965,14 +2049,14 @@
       z.m.position.set(z.x, 9, z.y); if (dead) { sc.remove(z.m); tz.splice(i, 1); }
     }
 
-    collide(); jackUpd(dt, tg); fireResponse(dt); flameUpd(dt);
+    collide(); jackUpd(dt, tg); fireResponse(dt); flameUpd(dt); wellUpd(dt); napUpd(dt);
     for (const j of jets) j.scale.y = 0.75 + Math.abs(Math.sin(T * 4)) * 0.4;
     for (const f of foam) { f.ph += dt * 0.9; const o = Math.sin(f.ph) * 26; f.m.position.x = f.bx + f.nx * o; f.m.position.z = f.bz + f.nz * o; f.m.material.opacity = 0.3 + Math.abs(Math.cos(f.ph)) * 0.3; }
     for (const s of sees) s.rotation.z = Math.sin(T * 1.3 + s.userData.ph) * 0.3;
     if (vb.ball) { const u = (T * 0.55) % 2, toward = u < 1 ? 1 : -1, k = u % 1; vb.ball.position.set(vb.x + Math.sin(T * 0.9) * 14, 14 + Math.sin(k * Math.PI) * 48, vb.y + toward * (-55 + 110 * k)); }
 
     for (let i = bul.length - 1; i >= 0; i--) {
-      const b = bul[i]; b.t -= dt; if (b.home) homeSteer(b, dt); b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
+      const b = bul[i]; b.t -= dt; if (b.home) homeSteer(b, dt); if (b.bmr) bmrStep(b, dt); b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
       if (b.vz) b.z += b.vz * dt;
       let dead = b.t <= 0 || !inW(b.x, b.y) || (!b.thru && b.z < bh(b.x, b.y)) || (b.vz && b.z < 2);
       if (!dead) for (const c of cars) {
@@ -1997,6 +2081,7 @@
         }
       }
       if (!dead && MP.bulletHit(b)) dead = true;
+      if (dead) { const wd = WP[b.w]; if (wd.hole) wellAdd(b.x, b.y); if (wd.nap) napAdd(b.x, b.y); if (wd.tp) tpShot(b); }
       if (dead && WP[b.w].rk) { boom(b.x, b.y, b.w === 11 ? 80 : 95, b.w === 11 ? 85 : 100); if (WP[b.w].clu) for (let k = 0; k < 3; k++) { const aa = k * 2.094 + Math.random(); boom(b.x + Math.cos(aa) * 55, b.y + Math.sin(aa) * 55, 55, 60); } }
       b.m.position.set(b.x, b.z, b.y); if (dead) { sc.remove(b.m); bul.splice(i, 1); }
     }
@@ -2309,14 +2394,18 @@
     const COLORS = [0xff4d6d, 0x4da6ff, 0x7bd44a, 0xffc400, 0xb06cff, 0x2fe0c8, 0xff8a3d, 0xff6ad5];
     const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const rc = n => { let s = ''; for (let i = 0; i < n; i++) s += ALPH[Math.floor(Math.random() * ALPH.length)]; return s; };
-    const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+    let guest = false;   // 게스트는 서버·브라우저 어디에도 저장하지 않음
+    const isGuestName = n => /^게스트\d{4}$/.test(n);
+    const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { if (guest && (k === 'cc_money' || k === 'cc_own')) return; try { localStorage.setItem(k, v); } catch (e) {} } };
     const hex = c => '#' + (c >>> 0).toString(16).padStart(6, '0');
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
 
     const myId = LS.get('cc_id') || ('u' + rc(10)); LS.set('cc_id', myId);
     const myCode = LS.get('cc_code') || rc(5); LS.set('cc_code', myCode);
-    let myName = LS.get('cc_name') || ('플레이어' + Math.floor(1000 + Math.random() * 9000)); LS.set('cc_name', myName);
+    { const sn = LS.get('cc_name'); guest = !sn || isGuestName(sn); }
+    let myName = guest ? '게스트' + Math.floor(1000 + Math.random() * 9000) : LS.get('cc_name');
+    if (guest) LS.set('cc_name', ''); else LS.set('cc_name', myName);
     const myColor = COLORS[Math.abs([...myId].reduce((a, c) => a * 31 + c.charCodeAt(0) | 0, 7)) % COLORS.length];
 
     let sb = null, ch = null, room = myCode, status = '연결 중...', sendT = 0, lastSent = '', lastForce = 0, lastD = null;
@@ -2437,7 +2526,7 @@
     });
     window.addEventListener('wheel', e => {
       if (!P.onFoot || shopOpen || mapOpen) return;
-      const list = [0, 1, 2, 3, 4, 5].concat([6, 7, 8, 9, 10, 11, 12, 13].filter(i => own[i]));
+      const list = [0, 1, 2, 3, 4, 5].concat(SPW.filter(i => own[i]));
       const n = list.indexOf(wi), d = e.deltaY > 0 ? 1 : -1;
       selW(list[(n + d + list.length) % list.length]);
     }, { passive: true });
@@ -2599,16 +2688,46 @@
 
     function refreshUI() {
       $('mpLeaveRow').style.display = room === myCode ? 'none' : 'flex';
-      const list = [`<span style="color:${hex(myColor)}">● ${esc(myName)} (나)</span>`];
-      for (const r of remotes.values()) list.push(`<span style="color:${hex(r.color)}">● ${esc(r.name)}</span>`);
+      const list = [`<span style="color:${hex(myColor)}">● ${esc(myName)} (나)${pvpOn() ? ' ⚔️' : ''}</span>`];
+      for (const r of remotes.values()) list.push(`<span style="color:${hex(r.color)}">● ${esc(r.name)}${r.pv ? ' ⚔️' : ''}</span>`);
       $('mpPl').innerHTML = `<b>${room === myCode ? '내 방' : '친구 방 ' + room}</b> · ${list.length}명<br>` + list.join('<br>');
       $('mpSt').textContent = status;
     }
-    function setName(n) {
+    let nameBusy = false;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    async function setName(n) {
       n = String(n || '').trim().slice(0, 12); if (!n) return;
       if (n === myName) { blurUI(); return; }
-      saveProfile(true); blurUI(); myName = n; LS.set('cc_name', n); addFeed('닉네임: ' + n, '#ffd23f'); loadProfile();
-      if (ch) ch.track({ id: myId, name: myName, color: myColor }); refreshUI();
+      blurUI();
+      if (isGuestName(n)) { msg('게스트 이름은 쓸 수 없어요 · 다른 닉네임을 정해주세요'); $('mpName').value = myName; return; }
+      if (nameBusy) return;
+      if (!sb) { msg('서버에 연결 중이에요 · 잠시 뒤 다시 시도해주세요'); $('mpName').value = myName; return; }
+      nameBusy = true; const old = myName;
+      try {
+        const { data: ex, error: e1 } = await sb.from('cc_profiles').select('name').eq('name', n).maybeSingle();
+        if (e1) { msg('닉네임 확인에 실패했어요 · 잠시 뒤 다시 시도해주세요'); return; }
+        if (guest) {
+          if (ex) {   // 이미 있는 이름 = 그 계정으로 접속
+            guest = false; myName = n; LS.set('cc_name', n);
+            addFeed('닉네임: ' + n + ' (저장된 계정을 불러와요 · 게스트 진행은 사라져요)', '#ffd23f'); await loadProfile();
+          } else {    // 새 이름 = 게스트 진행을 그대로 이어받아 계정 생성
+            guest = false; myName = n; LS.set('cc_name', n); LS.set('cc_money', String(money)); LS.set('cc_own', JSON.stringify(own));
+            profReady = true; profSig = ''; await saveProfile(true);
+            addFeed(`💾 ${n} 계정 생성! 이제부터 저장돼요 (다른 기기에서도 이 닉네임이면 이어짐)`, '#7fd');
+          }
+        } else {
+          if (ex) { msg('이미 있는 닉네임이에요'); return; }
+          for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+          await saveProfile(true); for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+          profReady = false;
+          const { error: e2 } = await sb.from('cc_profiles').update({ name: n, updated_at: new Date().toISOString() }).eq('name', old);
+          if (e2) { profReady = true; msg('닉네임을 바꾸지 못했어요 (이미 있는 이름일 수 있어요)'); return; }
+          myName = n; LS.set('cc_name', n); profReady = true; profSig = ''; await saveProfile(true);   // 원래 행이 없었다면 여기서 생성
+          addFeed(`닉네임 변경: ${old} → ${n} (같은 계정, 돈·무기 그대로)`, '#ffd23f');
+        }
+        if (ch) ch.track({ id: myId, name: myName, color: myColor });
+      } catch (e) { msg('닉네임 변경 중 오류가 났어요'); }
+      finally { nameBusy = false; $('mpName').value = myName; refreshUI(); }
     }
     function joinCode(c) {
       c = String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
@@ -2627,7 +2746,7 @@
         sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 30 } } });
         setTimeout(() => { if (skipProf) skipProf = false; else loadProfile(); }, 0);
       }
-      const c = sb.channel('crimecity4:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
+      const c = sb.channel('crimecity5:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
       ch = c;
       const on = (ev, fn) => c.on('broadcast', { event: ev }, ({ payload: d }) => { if (c === ch && d && d.id !== myId) { lastRx = performance.now(); fn(d); } });
       on('s', d => applyState(ensure(d.id, d), d));
@@ -2651,6 +2770,8 @@
       on('hit', d => { if (d.to === myId) onHit(d); });
       on('reward', d => { if (d.to === myId) { money += d.amt; msg(d.text); playSound('cash'); } });
       on('guide', d => guideRecv(d));
+      on('pvp', d => { if (d.to === myId) pvpRecv(d); });
+      on('pvk', d => addFeed(`⚔️ ${d.killer ? d.killer + ' 님이 ' : ''}${d.victim} 님을 처치!`, '#ff8a5a'));
       on('fx', d => {
         const r = remotes.get(d.id);
         if (d.k === 'horn' && Math.hypot(d.x - P.x, d.y - P.y) < 900) horn(false);
@@ -2678,7 +2799,7 @@
     }
     function applyState(r, d) {
       r.seen = performance.now();
-      r.tx = d.x; r.ty = d.y; r.tz = d.z || 0; r.ta = d.a || 0; r.onFoot = !!d.f; r.heat = d.h || 0; r.rd = d.rd || null; if (d.m !== undefined) r.money = d.m; r.gd = !!d.gd; r.jp = d.jp || 0; r.kind = d.f ? null : (d.k || 'car'); r.nid = d.f ? 0 : (d.ni || 0);
+      r.tx = d.x; r.ty = d.y; r.tz = d.z || 0; r.ta = d.a || 0; r.onFoot = !!d.f; r.heat = d.h || 0; r.rd = d.rd || null; if (d.m !== undefined) r.money = d.m; r.gd = !!d.gd; r.pv = d.pv || 0; r.jp = d.jp || 0; r.kind = d.f ? null : (d.k || 'car'); r.nid = d.f ? 0 : (d.ni || 0);
       if (d.n && d.n !== r.name) rename(r, d.n);
       setCarModel(r, d.f ? '' : (d.k || 'car'), d.cc, d.tx, d.pc);
     }
@@ -2729,6 +2850,12 @@
       for (const [k, g] of ghosts) if (g.owner === owner && !live.has(k)) { sc.remove(g.m); ghosts.delete(k); }
     }
     function bulletHit(b) {
+      if (pvpOn() && php > 0) for (const r of remotes.values()) {
+        if (!r.pv || r.gd || (b.ig && b.ig.has(r))) continue;
+        if (Math.hypot((r.tx || 0) - b.x, (r.ty || 0) - b.y) > (r.onFoot ? 13 : 24) || Math.abs((r.tz || 0) + 8 - b.z) > 40) continue;
+        if (!WP[b.w].rk) pvpHit(r, b.w === 4 ? 0 : bdm(b), b.w);
+        return !pierceOk(b, r);
+      }
       if (!ghosts.size) return false;
       for (const g of ghosts.values()) {
         if (g.t === 'o') { if (g.dead || Math.hypot(g.x - b.x, g.y - b.y) > 12) continue; }
@@ -2895,7 +3022,7 @@
       '<rect x="1" y="15" width="46" height="5" rx="2"/><rect x="4" y="11" width="34" height="3" rx="1"/><rect x="4" y="21" width="34" height="3" rx="1"/><rect x="2" y="19" width="10" height="11" rx="3"/>',
       '<rect x="2" y="9" width="40" height="7" rx="3"/><rect x="2" y="18" width="40" height="7" rx="3"/><rect x="14" y="24" width="7" height="10"/><circle cx="43" cy="12.5" r="3.5"/><circle cx="43" cy="21.5" r="3.5"/>'
     ];
-    [6, 7, 8, 9, 10, 11, 12, 13].forEach((i, n) => mkSlot(0, WP[i].n, `<svg viewBox="0 0 48 40" fill="${hex(WP[i].col)}">${SP_SVG[n % 3]}</svg>`, () => selW(i)));
+    SPW.forEach((i, n) => mkSlot(0, WP[i].n, `<svg viewBox="0 0 48 40" fill="${hex(WP[i].col)}">${SP_SVG[n % 3]}</svg>`, () => selW(i)));
     document.body.appendChild(hb);
     const pick = document.createElement('div'); pick.id = 'pickup'; document.body.appendChild(pick);
     let pickTO = 0, pg = gren, pt2 = tnt;
@@ -3038,7 +3165,7 @@
         if (P.z <= f2 && P.vzj <= 0) {
           const drop = (P.zPk || P.z) - f2;
           P.z = f2; P.air = 0; P.vzj = 0; P.roof = f2 > 0 ? bAt(P.x, P.y) : null;
-          if (drop > 170 && !(jumpT > 0) && !(god > 0) && T - jpLast > 0.6) { tased = Math.min(2.5, drop / 90); shake = 10; msg('착지 충격!'); }
+          if (drop > 170 && !(jumpT > 0) && !(god > 0) && !own.chute && T - jpLast > 0.6) { tased = Math.min(2.5, drop / 90); shake = 10; msg('착지 충격!'); }
           else if (f2 > 0 && drop > 20) msg('🏢 옥상 착지');
         }
       } else { P.z = fl; if (fl > 0 && !P.roof) P.roof = bAt(P.x, P.y); if (!fl) P.roof = null; }
@@ -3060,11 +3187,11 @@
     }
 
     // ---------------------------------------------------------------- 상점 (U)
-    const own = (() => { try { return JSON.parse(LS.get('cc_own') || '{}'); } catch (e) { return {}; } })();
-    let god = 0, jumpT = 0, spdT = 0, shopOpen = false, myAura = null;
+    const own = guest ? {} : (() => { try { return JSON.parse(LS.get('cc_own') || '{}'); } catch (e) { return {}; } })();
+    let god = 0, jumpT = 0, spdT = 0, nitroT = 0, shopOpen = false, myAura = null;
     function selW(i) { if (!P.onFoot || (i >= 6 && !own[i])) return; wi = i; rel = 0; scope = false; wmsg(i); }
     function cycleSpecial() {
-      const list = [6, 7, 8, 9, 10, 11, 12, 13].filter(i => own[i]); if (!list.length) { msg('특수 무기가 없어요 · U 상점에서 구매'); return; }
+      const list = SPW.filter(i => own[i]); if (!list.length) { msg('특수 무기가 없어요 · U 상점에서 구매'); return; }
       const n = list.indexOf(wi); selW(list[(n + 1) % list.length]);
     }
     function auraMesh() {
@@ -3091,7 +3218,18 @@
       { id: 'ammo', ic: '📦', n: '탄약 전부 충전', d: '모든 무기 탄창 가득', p: 500 },
       { id: 'fix', ic: '🔧', n: '차량 수리', d: '타고 있는 차 체력 회복', p: 1500 },
       { id: 'bt', ic: '⏱️', n: '불릿타임 충전', d: 'Q 게이지 가득', p: 800 },
-      { id: 'clr', ic: '🕶️', n: '수배 지우기', d: '수배 별 전부 제거', p: 5000 }
+      { id: 'clr', ic: '🕶️', n: '수배 지우기', d: '수배 별 전부 제거', p: 5000 },
+      { id: 'arc', ic: '🌩️', n: '번개총', d: '14발 · 맞으면 주변 3명에게 연쇄 번개', p: 120000, w: 14 },
+      { id: 'saw', ic: '🪚', n: '회전톱', d: '10발 · 날아갔다 돌아오며 관통', p: 95000, w: 15 },
+      { id: 'hole', ic: '🕳️', n: '블랙홀 건', d: '3발 · 차·경찰·시민을 빨아들이는 블랙홀', p: 350000, w: 16 },
+      { id: 'nap', ic: '🔥', n: '네이팜탄', d: '5발 · 맞은 곳이 6초간 불바다', p: 140000, w: 17 },
+      { id: 'tele', ic: '🌀', n: '텔레포트 건', d: '6발 · 탄이 닿은 곳으로 순간이동', p: 180000, w: 18 },
+      { id: 'pvp', ic: '⚔️', get n() { return 'PvP 모드' + (own.pvp ? (own.pvpOn ? ' · 켜짐' : ' · 꺼짐') : ''); }, get d() { return own.pvp ? '클릭하면 켜기/끄기 · 켠 사람끼리만 서로 데미지 · 죽으면 돈 10%를 처치한 사람이 가져가요' : 'PvP를 켠 사람끼리만 서로 공격 · 상점에서 언제든 켜고 끌 수 있어요'; }, p: 500000, perm: 'pvp', tg: () => own.pvpOn ? 'ON' : 'OFF' },
+      { id: 'chute', ic: '🪂', n: '낙하산', d: '높은 곳에서 떨어져도 착지 충격 없음 (영구)', p: 60000, perm: 'chute' },
+      { id: 'vest', ic: '🦺', n: '방탄조끼', d: '체포 벌금 절반 · PvP 피해 25% 감소 (영구)', p: 90000, perm: 'vest' },
+      { id: 'bag', ic: '💼', n: '현금 가방', d: '강도 보상 +30% (영구)', p: 120000, perm: 'bag' },
+      { id: 'can', ic: '🛢️', n: '휴대용 연료통', d: '타고 있는 차 연료를 가득 채움', p: 2500 },
+      { id: 'nitro', ic: '🏎️', n: '니트로', d: '30초간 차 최고속도 +40%', p: 12000 }
     ];
     const shopEl = document.createElement('div'); shopEl.id = 'shop';
     const shopCss = document.createElement('style');
@@ -3118,7 +3256,7 @@
       $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString();
       $('shopGr').innerHTML = ITEMS.map(it => {
         const ow = (it.w && own[it.w]) || (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && money < it.p;
-        return `<div class="it${ow ? ' own' : no ? ' no' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : '보유 중') : '$' + it.p.toLocaleString()}</div></div>`;
+        return `<div class="it${ow ? ' own' : no ? ' no' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : it.tg ? it.tg() : '보유 중') : '$' + it.p.toLocaleString()}</div></div>`;
       }).join('');
     }
     shopEl.addEventListener('click', e => { const t = e.target.closest('.it'); if (t) buy(t.dataset.id); });
@@ -3138,13 +3276,15 @@
         money -= pr; own.jpu = (own.jpu || 0) + 1; saveOwn(); jpFuel = jpMax(); playSound('cash');
         msg(`⛽ 제트팩 연료 Lv${own.jpu} (용량 ${jpMax()}) -$${pr.toLocaleString()}`); event(`님이 제트팩 연료를 Lv${own.jpu}로 업그레이드했습니다!`); renderShop(); return;
       }
+      if (id === 'pvp' && own.pvp) { own.pvpOn = own.pvpOn ? 0 : 1; php = 100; saveOwn(); msg(own.pvpOn ? '⚔️ PvP 켜짐 · 켠 사람끼리 서로 공격할 수 있어요' : '🕊️ PvP 꺼짐'); renderShop(); return; }
       if (it.w && own[it.w]) { selW(it.w); toggleShop(false); return; }
       if (it.perm && own[it.perm]) { msg('이미 갖고 있어요'); return; }
       if (id === 'fix' && P.onFoot) { msg('차에 타고 있을 때만 수리할 수 있어요'); return; }
+      if (id === 'can' && (P.onFoot || !P.car || P.car.kind === 'heli')) { msg('차에 타고 있을 때만 쓸 수 있어요'); return; }
       if (money < it.p) { msg(`돈이 부족해요 ($${(it.p - Math.round(money)).toLocaleString()} 더 필요)`); playSound('shoot'); return; }
       money -= it.p; playSound('cash');
       if (it.w) { own[it.w] = 1; LS.set('cc_own', JSON.stringify(own)); am[it.w] = WP[it.w].mag; if (P.onFoot) { wi = it.w; rel = 0; scope = false; } event(`님이 ${it.n}을(를) 샀습니다!`); }
-      else if (it.perm) { own[it.perm] = 1; LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg(it.perm === 'gh' ? '🪝 그래플링 훅 획득! 건물을 조준하고 C' : '🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요'); }
+      else if (it.perm) { own[it.perm] = 1; if (it.perm === 'pvp') { own.pvpOn = 1; php = 100; } LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg(it.perm === 'gh' ? '🪝 그래플링 훅 획득! 건물을 조준하고 C' : it.perm === 'pvp' ? '⚔️ PvP 켜짐! 상점에서 언제든 켜고 끌 수 있어요' : it.perm === 'jp' ? '🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요' : '✅ ' + it.n + ' 획득!'); }
       else if (id === 'god') { god = 30; event('님이 무적 포션을 마셨습니다 (30초)'); }
       else if (id === 'spd') spdT = 30;
       else if (id === 'jmp') jumpT = 30;
@@ -3153,11 +3293,14 @@
       else if (id === 'ammo') { for (let i = 0; i < WP.length; i++) am[i] = WP[i].mag; rel = 0; }
       else if (id === 'fix') P.car.hp = P.car.mhp || 100;
       else if (id === 'bt') en = 100;
+      else if (id === 'can') P.car.fuel = 100;
+      else if (id === 'nitro') { nitroT = 30; msg('🏎️ 니트로! 30초간 차가 빨라져요'); }
       else if (id === 'clr') { heat = 0; bust = 0; }
       msg(`${it.ic} ${it.n} 구매 완료  -$${it.p.toLocaleString()}`);
       renderShop();
     }
     function shopTick(dt) {
+      if (nitroT > 0) { nitroT -= dt; if (nitroT <= 0) msg('🏎️ 니트로 종료'); }
       if (shopOpen) { mdown = false; $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString(); }
       if (god > 0) {
         god -= dt; tased = 0; bust = 0;
@@ -3177,6 +3320,7 @@
     function drawBuffs() {
       const b = [];
       if (god > 0) b.push(['🛡️ 무적', god, '#ffd23f']);
+      if (nitroT > 0) b.push(['🏎️ 니트로', nitroT, '#ff8a2a']);
       if (spdT > 0) b.push(['💨 스피드', spdT, '#6ff']);
       if (jumpT > 0) b.push(['🦘 슈퍼점프', jumpT, '#9f6']);
       if (own.jp) b.push(['🎒 연료 Lv' + (own.jpu || 0), jpFuel / jpMax() * 30, jpOn ? '#f93' : '#fa6', Math.round(jpFuel / jpMax() * 100) + '%']);
@@ -3194,7 +3338,7 @@
     // ---------------------------------------------------------------- 닉네임별 저장 (Supabase cc_profiles)
     let profReady = false, profSig = '', profT = performance.now(), profBusy = false;
     async function loadProfile() {
-      if (!sb) return; const nm = myName; profReady = false;
+      if (!sb || guest) return; const nm = myName; profReady = false;
       try {
         const { data, error } = await sb.from('cc_profiles').select('money,own').eq('name', nm).maybeSingle();
         if (nm !== myName || error) return;
@@ -3229,7 +3373,7 @@
       if (joined() && sendT <= 0) {
         sendT = P.onFoot ? 1 / 6 : 1 / 10;
         const k = P.onFoot ? null : P.car, o = k || P;
-        const d = { n: myName, x: r1(o.x), y: r1(o.y), z: r1((k ? k.z : P.z + (P.jh || 0)) || 0), a: r2(o.a), f: P.onFoot ? 1 : 0, h: Math.ceil(heat), rd: ride || 0, m: Math.round(money), gd: god > 0 ? 1 : 0, jp: own.jp ? (jpOn ? 2 : 1) : 0 };
+        const d = { n: myName, x: r1(o.x), y: r1(o.y), z: r1((k ? k.z : P.z + (P.jh || 0)) || 0), a: r2(o.a), f: P.onFoot ? 1 : 0, h: Math.ceil(heat), rd: ride || 0, m: Math.round(money), pv: pvpOn() ? 1 : 0, gd: god > 0 ? 1 : 0, jp: own.jp ? (jpOn ? 2 : 1) : 0 };
         if (k) { d.ni = k.nid || 0; d.k = k.kind || 'car'; d.cc = k.color; d.tx = k.taxi ? 1 : 0; d.pc = k.type === 'c' ? 1 : 0; }
         const sig = JSON.stringify(d);
         if (sig !== lastSent || now - lastForce > 1500) { lastSent = sig; lastForce = now; lastD = d; send('s', d); }
@@ -3336,7 +3480,7 @@
       for (const r of remotes.values()) { ctx2.fillStyle = hex(r.color); ctx2.beginPath(); ctx2.arc(mx + r.x * m, my + r.y * m, 4, 0, 7); ctx2.fill(); ctx2.strokeStyle = '#000'; ctx2.lineWidth = 1; ctx2.stroke(); }
     }
     function shot(x, y, z, a, col, sz, v) { send('shot', { x: Math.round(x), y: Math.round(y), z: Math.round(z), a: Math.round(a * 1000) / 1000, c: col, s: sz, v }); }
-    function boomEv(x, y, r, dmg) { send('boom', { x: Math.round(x), y: Math.round(y), r: Math.round(r), dmg: Math.round(dmg || 100) }); }
+    function boomEv(x, y, r, dmg) { if (pvpOn()) for (const r2 of remotes.values()) if (r2.pv && !r2.gd) { const dd = Math.hypot((r2.tx || 0) - x, (r2.ty || 0) - y); if (dd < r) pvpHit(r2, (dmg || 100) * (1 - dd / r * 0.7) * 0.6, 3); } send('boom', { x: Math.round(x), y: Math.round(y), r: Math.round(r), dmg: Math.round(dmg || 100) }); }
     function loot(text, amount) { event(text, { loot: amount, x: Math.round(P.x), y: Math.round(P.y) }); }
 
 
@@ -3674,6 +3818,40 @@
     }
     mapC.addEventListener('mousemove', e => { mapC._cx = e.clientX; mapC._cy = e.clientY; });
 
+
+    // ---------------------------------------------------------------- PvP 모드 (상점 $500,000 · 켠 사람끼리만 서로 공격)
+    let php = 100, phT = 0, pvShield = 0, hurtT = 0, lastAtk = null;
+    const pvpOn = () => !!(own.pvp && own.pvpOn);
+    function pvpHit(r, dmg, w) { send('pvp', { to: r.id, d: Math.round(Math.min(dmg, 75)), w }); heat = Math.min(5, heat + 0.2); }
+    function pvpRad(x, y, rad, dmg, w) { if (!pvpOn()) return; for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.tx || 0) - x, (r.ty || 0) - y) < rad) pvpHit(r, dmg, w); }
+    function pvpCone(inCone, dt, lv) {
+      if (!pvpOn()) return;
+      for (const r of remotes.values()) if (r.pv && !r.gd && inCone(r.tx || 0, r.ty || 0, 8)) { r.flT = (r.flT || 0) + dt; if (r.flT > 0.3) { r.flT = 0; pvpHit(r, 9 * (1 + 0.15 * lv), 9); } }
+    }
+    function pvpRay(x, y, z, d) {
+      if (!pvpOn()) return false;
+      for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.tx || 0) - x, (r.ty || 0) - y) < 14 && Math.abs((r.tz || 0) + 8 - z) < 40) { pvpHit(r, d, 5); return true; }
+      return false;
+    }
+    function pvpRecv(d) {
+      if (!pvpOn() || god > 0 || pvShield > 0 || php <= 0) return;
+      if (d.w === 4) { tased = Math.max(tased, 2); shake = Math.max(shake, 4); return; }
+      const dm = Math.round(d.d * (own.vest ? 0.75 : 1)); if (dm <= 0) return;
+      php = Math.max(0, php - dm); phT = performance.now(); hurtT = 0.35; shake = Math.max(shake, 5); lastAtk = { id: d.id, name: d.name };
+      if (php <= 0) pvpDie();
+    }
+    function pvpDie() {
+      const k = lastAtk; php = 100; pvShield = 5; lastAtk = null;
+      const loss = Math.min(50000, Math.floor(money * 0.1)); money -= loss;
+      if (k && loss > 0) send('reward', { to: k.id, amt: loss, text: `⚔️ ${myName} 처치! +$${loss.toLocaleString()}` });
+      send('pvk', { victim: myName, killer: k ? k.name : '', loss });
+      if (ride) exitRide(true);
+      if (!P.onFoot && P.car) { const c = P.car; c.type = 'k'; c.v = 0; P.car = null; P.onFoot = true; }
+      jk = null; robbing = null; P.gh = null; P.z = 0; P.roof = null; P.climb = 0; tased = 0; scope = false;
+      P.x = Math.round(rnd(2, N - 2)) * B; P.y = Math.round(rnd(2, N - 2)) * B + 40;
+      title('💀 처치당함', `${k ? k.name + ' 님에게 ' : ''}당했어요 · -$${loss.toLocaleString()} · 5초간 무적`, '#ff5a5a'); addFeed(`💀 ${k ? k.name + ' 님에게 ' : ''}처치당했어요 (-$${loss.toLocaleString()})`, '#f66');
+    }
+
     // ---------------------------------------------------------------- 건물 상호작용 · 매 프레임
     function station() {
       if (panel === 'deal' || panel === 'enh') { closePanel(); return true; }
@@ -3684,6 +3862,7 @@
       return false;
     }
     function v4Tick(dt) {
+      if (!pvpOn()) { php = 100; pvShield = 0; hurtT = 0; } else { if (pvShield > 0) pvShield -= dt; if (hurtT > 0) hurtT -= dt; if (php < 100 && performance.now() - phT > 6000) php = Math.min(100, php + 8 * dt); }
       if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money);  }
       stNear = null;
       if (P.onFoot && !activeInterior && !P.roof && P.z < 8) {
@@ -3701,6 +3880,8 @@
     }
     function v4Hud() {
       ctx.save(); ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.shadowBlur = 0;
+      if (guest) { ctx.textAlign = 'center'; ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#ffd23f'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚠ ' + myName + ' · 게스트는 저장되지 않아요 — 닉네임 변경을 해주세요', VW / 2, 6); ctx.textAlign = 'left'; ctx.shadowBlur = 0; }
+      if (pvpOn()) { ctx.fillStyle = '#0008'; ctx.fillRect(16, 192, 120, 10); ctx.fillStyle = php < 30 ? '#f33' : '#e55'; ctx.fillRect(16, 192, Math.max(0, php) * 1.2, 10); ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚔️ PvP ❤ ' + Math.ceil(php) + (pvShield > 0 ? ' 🛡' : ''), 16, 206); ctx.shadowBlur = 0; if (hurtT > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.35, hurtT)})`; ctx.fillRect(0, 0, VW, VH); } }
       if (!P.onFoot && P.car && P.car.kind !== 'heli') {
         const c = P.car, f = c.fuel === undefined ? 100 : c.fuel, low = f < 20;
         ctx.fillStyle = '#0008'; ctx.fillRect(16, 160, 120, 10); ctx.fillStyle = low ? (Math.floor(T * 4) % 2 ? '#f33' : '#a22') : '#fb3'; ctx.fillRect(16, 160, Math.max(0, f) * 1.2, 10);
@@ -3725,12 +3906,13 @@
       else if (k === 'escape' && mapMenu) mapMenu = null;
     });
 
-    const saved = +LS.get('cc_money'); if (saved > 0) money = saved;
+    const saved = guest ? 0 : +LS.get('cc_money'); if (saved > 0) money = saved;
+    if (guest) setTimeout(() => { title('👤 ' + myName, '게스트는 저장되지 않습니다! 닉네임 변경을 해주세요', '#ffd23f'); addFeed('⚠ 게스트는 저장되지 않아요 — 닉네임을 정하면 계정이 만들어지고 그때부터 저장돼요', '#ffd23f'); }, 2000);
     addFeed(`내 방 코드 ${myCode} — 친구가 이 코드로 참가하면 같이 플레이`, '#ffd23f');
     refreshUI();
     setTimeout(() => go(myCode), 300);
     setInterval(() => { if (lastD && performance.now() - lastForce > 2500) { lastForce = performance.now(); send('s', lastD); } }, 2500);
-    return { tick, hud, mini, wlv, station, shot, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1), phys, pS: pSolid, jump: doJump };
+    return { tick, hud, mini, wlv, station, shot, nitro: () => nitroT > 0, has: k => !!own[k], pvpOn, pvpCone, pvpRad, pvpRay, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1), phys, pS: pSolid, jump: doJump };
   })();
 
   let last = performance.now();
