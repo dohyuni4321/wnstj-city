@@ -205,12 +205,13 @@
     keys[k] = 1;
     if (k === 'e' && !MP.rideKey()) toggle();
     if (k === '7' && !e.repeat && P.onFoot && !activeInterior) igniteNearbyBuilding();
-    if (k === 't' && !e.repeat && P.onFoot && !P.climb && tnt > 0) throwTNT();
+    if (k === 't' && !e.repeat && P.onFoot && !P.climb && tnt > 0) { if (tcd > 0) msg(`🧨 TNT 쿨타임 ${tcd.toFixed(1)}초`); else throwTNT(); }
     if (!e.repeat) {
       if (k === 'r' && P.onFoot && rel <= 0 && am[wi] < WP[wi].mag) { rel = WP[wi].rel; msg('장전 중...'); }
       if (P.onFoot && k >= '1' && k <= '6') { wi = +k - 1; rel = 0; scope = false; msg(WP[wi].n); }
-      if (k === 'g' && P.onFoot && !P.climb && gren > 0) {
-        gren--; heat = Math.min(5, heat + 0.2);
+      if (k === 'g' && P.onFoot && !P.climb && gren > 0 && gcd > 0) msg(`💣 수류탄 쿨타임 ${gcd.toFixed(1)}초`);
+      else if (k === 'g' && P.onFoot && !P.climb && gren > 0) {
+        gcd = 3; gren--; heat = Math.min(5, heat + 0.2);
         const gm = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), M(0x3a5f2a));
         sc.add(gm);
         gr.push({ m: gm, x: P.x + Math.cos(P.a) * 10, y: P.y + Math.sin(P.a) * 10, z: 12 + P.z, vx: Math.cos(P.a) * 280, vy: Math.sin(P.a) * 280, vz: 140, t: 1.6 });
@@ -251,7 +252,7 @@
   document.getElementById('btn-fire').addEventListener('touchend', (e)=>{ e.preventDefault(); mdown = 0; });
   document.getElementById('btn-dash').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && dcd <= 0){ dsh = 0.18; dcd = 2.5; shake = 3; } });
   document.getElementById('btn-bullet').addEventListener('touchstart', (e)=>{ e.preventDefault(); slow = !slow; });
-  document.getElementById('btn-grenade').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && gren > 0){ gren--; const gm = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), M(0x3a5f2a)); sc.add(gm); gr.push({ m: gm, x: P.x + Math.cos(P.a) * 10, y: P.y + Math.sin(P.a) * 10, z: 12 + P.z, vx: Math.cos(P.a) * 280, vy: Math.sin(P.a) * 280, vz: 140, t: 1.6 }); } });
+  document.getElementById('btn-grenade').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && gren > 0 && gcd <= 0){ gcd = 3; gren--; const gm = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), M(0x3a5f2a)); sc.add(gm); gr.push({ m: gm, x: P.x + Math.cos(P.a) * 10, y: P.y + Math.sin(P.a) * 10, z: 12 + P.z, vx: Math.cos(P.a) * 280, vy: Math.sin(P.a) * 280, vz: 140, t: 1.6 }); } });
 
   const M = c => new THREE.MeshLambertMaterial({ color: c });
   const bx = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -453,7 +454,7 @@
   // GAME STATE & WEAPONS DATA
   // ============================================================================
   const cars = [], peds = [], cash = [], fx = [], meshes = new Map(), bul = [], gr = [];
-  let wi = 0, rel = 0, cd = 0, gren = 3, en = 100, slow = false, dsh = 0, dcd = 0, tased = 0, nit = 100, scope = false, ay = 0, ap = 0;
+  let wi = 0, rel = 0, cd = 0, gren = 3, en = 100, slow = false, dsh = 0, dcd = 0, gcd = 0, tcd = 0, tased = 0, nit = 100, scope = false, ay = 0, ap = 0;
   const trc = [], mcs = {}, mc = c => mcs[c] || (mcs[c] = new THREE.MeshBasicMaterial({ color: c }));
   const offs = [], tz = [], tzM = new THREE.MeshBasicMaterial({ color: 0x66ddff });
 
@@ -823,7 +824,7 @@
     msg(({pol:'경찰서',fire:'소방서',mcd:'맥도날드'})[b.sp]+' 입장! [E] 출입');return true;
   }
   function throwTNT() {
-    tnt--;heat=Math.min(5,heat+0.4);
+    tcd = 6; tnt--;heat=Math.min(5,heat+0.4);
     const gm=bx(7,7,7,M(0xd22a24));sc.add(gm);
     gr.push({m:gm,x:P.x+Math.cos(P.a)*12,y:P.y+Math.sin(P.a)*12,z:12+P.z,
       vx:Math.cos(P.a)*250,vy:Math.sin(P.a)*250,vz:150,t:2.1,tnt:true});
@@ -1795,7 +1796,7 @@
     } else ay = 0;
     if (!(P.car && keys.shift && P.car.kind === 'sport')) nit = Math.min(100, nit + 14 * dt);
     if (tased > 0) tased -= dt;
-    const tf = slow ? 2.8 : 1; cd -= dt * tf; dcd -= dt * tf;
+    const tf = slow ? 2.8 : 1; cd -= dt * tf; dcd -= dt * tf; gcd -= dt * tf; tcd -= dt * tf;
     if (rel > 0) { rel -= dt * tf; if (rel <= 0) { am[wi] = WP[wi].mag; msg('장전 완료'); } }
 
     if (P.onFoot && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && cd <= 0 && rel <= 0) {
@@ -2837,6 +2838,7 @@
         s.querySelector('.a').textContent = am[i] + '/' + WP[i].mag;
         s.querySelector('.rl').style.width = (P.onFoot && wi === i && rel > 0 ? Math.max(0, 1 - rel / WP[i].rel) * 100 : 0) + '%';
       }
+      slots[7].querySelector('.rl').style.width = Math.max(0, gcd / 3) * 100 + '%'; slots[8].querySelector('.rl').style.width = Math.max(0, tcd / 6) * 100 + '%';
       slots[7].classList.toggle('gone', gren <= 0); slots[7].querySelector('.a').textContent = '×' + gren;
       slots[8].classList.toggle('gone', tnt <= 0); slots[8].querySelector('.a').textContent = '×' + tnt;
       slots[6].querySelector('.a').textContent = '';
