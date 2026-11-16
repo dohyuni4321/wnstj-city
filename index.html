@@ -2556,7 +2556,7 @@
         sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 30 } } });
         setTimeout(loadProfile, 0);
       }
-      const c = sb.channel('crimecity:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
+      const c = sb.channel('crimecity4:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
       ch = c;
       const on = (ev, fn) => c.on('broadcast', { event: ev }, ({ payload: d }) => { if (c === ch && d && d.id !== myId) fn(d); });
       on('s', d => applyState(ensure(d.id, d), d));
