@@ -2770,7 +2770,7 @@
       room = code; status = '연결 중...'; refreshUI();
       if (!sb) {
         if (!window.supabase) { status = '오프라인 (싱글플레이)'; refreshUI(); return; }
-        sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 30 } } });
+        sb = window.supabase.createClient(SB_URL, SB_KEY, { realtime: { params: { eventsPerSecond: 40 } } });
         setTimeout(() => { if (skipProf) skipProf = false; else loadProfile(); }, 0);
       }
       const c = sb.channel('crimecity5:' + code, { config: { broadcast: { self: false }, presence: { key: myId } } });
@@ -2826,6 +2826,7 @@
     }
     function applyState(r, d) {
       r.seen = performance.now();
+      if (r.lt !== undefined && r.tx !== undefined) { const dm = (r.seen - r.lt) / 1000; if (dm > 0.015 && dm < 0.6) { r.vx = Math.max(-900, Math.min(900, (d.x - r.tx) / dm)); r.vy = Math.max(-900, Math.min(900, (d.y - r.ty) / dm)); } } r.lt = r.seen;
       r.tx = d.x; r.ty = d.y; r.tz = d.z || 0; r.ta = d.a || 0; r.onFoot = !!d.f; r.heat = d.h || 0; r.rd = d.rd || null; if (d.m !== undefined) r.money = d.m; r.gd = !!d.gd; r.pv = d.pv || 0; r.jp = d.jp || 0; r.kind = d.f ? null : (d.k || 'car'); r.nid = d.f ? 0 : (d.ni || 0);
       if (d.n && d.n !== r.name) rename(r, d.n);
       setCarModel(r, d.f ? '' : (d.k || 'car'), d.cc, d.tx, d.pc);
@@ -2879,7 +2880,7 @@
     function bulletHit(b) {
       if (pvpOn() && php > 0) for (const r of remotes.values()) {
         if (!r.pv || r.gd || (b.ig && b.ig.has(r))) continue;
-        if (Math.hypot((r.tx || 0) - b.x, (r.ty || 0) - b.y) > (r.onFoot ? 22 : 34) || Math.abs((r.tz || 0) + 8 - b.z) > 60) continue;
+        if (Math.hypot((r.x || 0) - b.x, (r.y || 0) - b.y) > (r.onFoot ? 22 : 34) || Math.abs((r.z || 0) + 8 - b.z) > 60) continue;
         if (!WP[b.w].rk) pvpHit(r, b.w === 4 ? 0 : bdm(b), b.w);
         return !pierceOk(b, r);
       }
@@ -3394,7 +3395,7 @@
       // 내 상태 전송 (도보 6Hz / 차량 10Hz)
       sendT -= dt;
       if (joined() && sendT <= 0) {
-        sendT = P.onFoot ? 1 / 6 : 1 / 10;
+        sendT = pvpOn() ? 1 / 20 : P.onFoot ? 1 / 12 : 1 / 15;
         const k = P.onFoot ? null : P.car, o = k || P;
         const d = { n: myName, x: r1(o.x), y: r1(o.y), z: r1((k ? k.z : P.z + (P.jh || 0)) || 0), a: r2(o.a), f: P.onFoot ? 1 : 0, h: Math.ceil(heat), rd: ride || 0, m: Math.round(money), pv: pvpOn() ? 1 : 0, gd: god > 0 ? 1 : 0, jp: own.jp ? (jpOn ? 2 : 1) : 0 };
         if (k) { d.ni = k.nid || 0; d.k = k.kind || 'car'; d.cc = k.color; d.tx = k.taxi ? 1 : 0; d.pc = k.type === 'c' ? 1 : 0; }
@@ -3405,8 +3406,8 @@
       // 원격 플레이어
       for (const r of [...remotes.values()]) {
         if (now - r.seen > 20000) { dropRemote(r.id); continue; }
-        const k = Math.min(1, dt * 10), jump = Math.hypot(r.tx - r.x, r.ty - r.y) > 400, px = r.x, py = r.y;
-        r.x = jump ? r.tx : r.x + (r.tx - r.x) * k; r.y = jump ? r.ty : r.y + (r.ty - r.y) * k; r.z += (r.tz - r.z) * k; r.a += angN(r.ta - r.a) * k;
+        const k = Math.min(1, dt * 14), ex = Math.min(0.2, (now - (r.lt || now)) / 1000), gx = r.tx + (r.vx || 0) * ex, gy = r.ty + (r.vy || 0) * ex, jump = Math.hypot(r.tx - r.x, r.ty - r.y) > 400, px = r.x, py = r.y;
+        r.x = jump ? r.tx : r.x + (gx - r.x) * k; r.y = jump ? r.ty : r.y + (gy - r.y) * k; r.z += (r.tz - r.z) * k; r.a += angN(r.ta - r.a) * k;
         const spd = Math.hypot(r.x - px, r.y - py) / Math.max(dt, 1e-3);
         const show = r.onFoot && !r.rd;
         r.mesh.visible = show; r.mesh.position.set(r.x, r.z, r.y); r.mesh.rotation.y = -r.a;
@@ -3900,14 +3901,14 @@
       if (hit) { if (!P.onFoot && P.car) P.car.v *= -0.3; msg('⚔️ 아레나 경계예요'); }
     }
     function pvpHit(r, dmg, w) { send('pvp', { to: r.id, d: Math.round(Math.min(dmg, 75)), w }); heat = Math.min(5, heat + 0.2); }
-    function pvpRad(x, y, rad, dmg, w) { if (!pvpOn()) return; for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.tx || 0) - x, (r.ty || 0) - y) < rad) pvpHit(r, dmg, w); }
+    function pvpRad(x, y, rad, dmg, w) { if (!pvpOn()) return; for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.x || 0) - x, (r.y || 0) - y) < rad) pvpHit(r, dmg, w); }
     function pvpCone(inCone, dt, lv) {
       if (!pvpOn()) return;
       for (const r of remotes.values()) if (r.pv && !r.gd && inCone(r.tx || 0, r.ty || 0, 8)) { r.flT = (r.flT || 0) + dt; if (r.flT > 0.3) { r.flT = 0; pvpHit(r, 9 * (1 + 0.15 * lv), 9); } }
     }
     function pvpRay(x, y, z, d) {
       if (!pvpOn()) return false;
-      for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.tx || 0) - x, (r.ty || 0) - y) < 24 && Math.abs((r.tz || 0) + 8 - z) < 60) { pvpHit(r, d, 5); return true; }
+      for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.x || 0) - x, (r.y || 0) - y) < 24 && Math.abs((r.z || 0) + 8 - z) < 60) { pvpHit(r, d, 5); return true; }
       return false;
     }
     function pvpRecv(d) {
