@@ -3271,7 +3271,7 @@
       { id: 'stk', ic: '💣', n: '끈끈이 폭탄총', d: '6발 · 차·벽·바닥에 붙으면 2.5초 뒤 폭발', p: 110000, w: 19 },
       { id: 'leg', ic: '👑', n: '천벌 (레전드)', d: '3발 · 맞춘 곳에 궤도 포격 · 십자 5연속 대폭발', p: 300000000, w: 20, gold: 1 },
       { id: 'tele', ic: '🌀', n: '텔레포트 건', d: '6발 · 탄이 닿은 곳으로 순간이동', p: 180000, w: 18 },
-      { id: 'ab', ic: '☢️', get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, d: '1억 · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 안 켠 사람은 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요', p: 100000000 },
+      { id: 'ab', ic: '☢️', get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, d: '1억 · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 켠 사람·안 켠 사람 모두 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요', p: 100000000 },
       { id: 'pvp', ic: '⚔️', get n() { return 'PvP 모드' + (own.pvp ? (own.pvpOn ? ' · 켜짐' : ' · 꺼짐') : ''); }, get d() { return own.pvp ? '클릭하면 켜기/끄기 · 켠 사람끼리만 서로 데미지 · 죽으면 돈 10%를 처치한 사람이 가져가요' : 'PvP를 켠 사람끼리만 서로 공격 · 상점에서 언제든 켜고 끌 수 있어요'; }, p: 500000, perm: 'pvp', tg: () => own.pvpOn ? 'ON' : 'OFF' },
       { id: 'chute', ic: '🪂', n: '낙하산', d: '높은 곳에서 떨어져도 착지 충격 없음 (영구)', p: 60000, perm: 'chute' },
       { id: 'vest', ic: '🦺', n: '방탄조끼', d: '체포 벌금 절반 · PvP 피해 25% 감소 (영구)', p: 90000, perm: 'vest' },
@@ -3990,7 +3990,6 @@
       setTimeout(() => abOv.classList.remove('on'), 700);
       MP.abHole(d.x, d.y);
       if (d.owner === myId) { title('☢️ 투하 완료', `${ABN} · 상대 돈 10%가 들어와요`, '#ffd23f'); }
-      else if (pvpOn()) { title('⚔️ PvP 모드 보호', `${d.oname} 님의 ${ABN} — PvP를 켠 사람은 피해 없음`, '#7bd44a'); }
       else {
         const loss = Math.floor(money * 0.1); money -= loss;
         if (loss > 0) send('reward', { to: d.owner, amt: loss, text: `☢️ ${myName} 님 돈 10% 강탈! +$${loss.toLocaleString()}` });
