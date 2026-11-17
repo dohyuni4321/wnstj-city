@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>CRIME CITY 3D v3 · 멀티플레이</title>
   <style>
@@ -2342,8 +2343,10 @@
     }
 
     ctx.font = '12px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowBlur = 4;
+    if (!document.body.classList.contains('mob')) {
     ctx.fillText('L 차키(호출) · K 내 차 주차 · X ATM 송금 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · Y 슬롯', VW / 2, VH - 22);
     ctx.fillText('WASD 이동 · Shift 달리기 · Space 점프(차: 브레이크) · 클릭/X 사격 · 우클릭 조준 · R 장전 · E 탑승/털기/동승 · J 옥상 점프 · Enter 채팅', VW / 2, VH - 40);
+    }
 
     if (tt > 0) { ctx.globalAlpha = Math.min(1, tt); ctx.font = 'bold 24px system-ui'; ctx.shadowBlur = 6; ctx.fillText(toast, VW / 2, 70); ctx.globalAlpha = 1; }
 
@@ -2605,7 +2608,7 @@
     rd.domElement.style.cursor = 'crosshair';
     let msX = 0, msY = 0, mouseUsed = false;
     window.addEventListener('mousemove', e => {
-      if (!locked) { msX = e.clientX; msY = e.clientY; mouseUsed = true; return; }
+      if (!locked) { if (document.body.classList.contains('mob')) return; msX = e.clientX; msY = e.clientY; mouseUsed = true; return; }
       if (mapOpen) { vcx = Math.max(0, Math.min(innerWidth, vcx + (e.movementX || 0))); vcy = Math.max(0, Math.min(innerHeight, vcy + (e.movementY || 0))); hoverR = pickFriend(vcx, vcy); return; }
       const dx = e.movementX || 0, dy = e.movementY || 0;
       if (P.onFoot) { if (!(tased > 0) && !P.climb) P.a += dx * 0.0032 * (scope ? 0.35 : 1); }
@@ -2956,9 +2959,10 @@
     let aimFr = -1, aimH = null;
     function aimPt() {
       if (aimFr === T) return aimH; aimFr = T; aimH = null;
-      if (!locked && !mouseUsed) return null;
+      const touchAim = document.body.classList.contains('mob');
+      if (!locked && !mouseUsed && !touchAim) return null;
       const rc = rd.domElement.getBoundingClientRect();
-      if (locked) _ndc.set(0, 0); else _ndc.set((msX - rc.left) / rc.width * 2 - 1, -((msY - rc.top) / rc.height) * 2 + 1);
+      if (locked || touchAim) _ndc.set(0, 0); else _ndc.set((msX - rc.left) / rc.width * 2 - 1, -((msY - rc.top) / rc.height) * 2 + 1);
       cm.updateMatrixWorld(); _ray.setFromCamera(_ndc, cm);
       const o = _ray.ray.origin, d = _ray.ray.direction, t0 = Math.hypot(o.x - P.x, o.z - P.y) + 6;
       let best = 1600;
@@ -4119,13 +4123,15 @@
         :root{--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
         body.mob{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
         body.mob .touch-btn,body.mob #btn-shop,body.mob .v4b,body.mob #touch-controls{display:none!important}
-        body.mob #hotbar{bottom:calc(var(--sb) + 8px);max-width:44vw;overflow-x:auto;justify-content:flex-start;gap:4px;padding:2px}
-        body.mob #hotbar .sl{width:48px;height:48px;flex:0 0 48px;border-radius:10px}body.mob #hotbar .sl .n{font-size:8px}body.mob #hotbar svg{width:34px;height:28px}body.mob #hotbar .ic{font-size:20px}
+        body.mob #hotbar{bottom:calc(var(--sb) + 8px);max-width:44vw;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;gap:4px;padding:6px 3px 3px;-webkit-overflow-scrolling:touch}
+        body.mob #hotbar .sl.on{transform:none}body.mob #hotbar .k{font-size:10px;top:2px;left:4px}body.mob #hotbar .a{font-size:9.5px;top:2px;right:3px}
+        body.mob #hotbar .sl{width:48px;height:48px;flex:0 0 48px;border-radius:10px}body.mob #hotbar .sl .n{font-size:8px}body.mob #hotbar .sl{height:52px;flex-basis:48px}body.mob #hotbar svg{width:30px;height:21px;margin-top:-2px}body.mob #hotbar .ic{font-size:18px;margin-top:-2px}body.mob #hotbar .n{bottom:2px}
+        body.mob:not(.mpon) #mp{display:none!important}
         #mob{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:system-ui,sans-serif}
         #mob .b{position:absolute;pointer-events:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.1;color:#fff;font-weight:800;font-size:13px;background:rgba(20,24,34,.55);border:2px solid rgba(255,255,255,.35);backdrop-filter:blur(3px);-webkit-tap-highlight-color:transparent;touch-action:none}
         #mob .b.on{background:rgba(255,210,63,.6);border-color:#ffd23f}#mob .b small{font-size:9px;font-weight:600;opacity:.85}
         #mob .fire{background:rgba(255,60,60,.5);border-color:rgba(255,140,140,.8);font-size:15px}
-        #mob .stk{position:absolute;pointer-events:none;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);display:none}
+        #mob .stk{position:absolute;pointer-events:none;opacity:.55;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);display:none}
         #mob .stk i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:rgba(255,255,255,.45)}
         #mmenu{position:absolute;right:calc(var(--sr) + 14px);bottom:calc(var(--sb) + 210px);display:none;grid-template-columns:repeat(4,56px);gap:8px;pointer-events:auto;padding:10px;border-radius:16px;background:rgba(10,12,18,.82);border:1px solid rgba(255,255,255,.2)}
         #mmenu .b{position:static;width:56px;height:56px;border-radius:12px;font-size:12px}
@@ -4133,6 +4139,8 @@
       document.head.appendChild(st);
       const root = document.createElement('div'); root.id = 'mob'; document.body.appendChild(root);
       const stick = document.createElement('div'); stick.className = 'stk'; stick.style.width = stick.style.height = '130px'; stick.innerHTML = '<i></i>'; root.appendChild(stick);
+      const stickIdle = () => { stick.style.display = 'block'; stick.style.opacity = '.55'; stick.style.left = 'calc(var(--sl) + 36px)'; stick.style.top = (innerHeight - 190) + 'px'; stick.firstChild.style.transform = 'translate(0,0)'; };
+      stickIdle(); addEventListener('resize', () => { if (stId === null) stickIdle(); });
       const act = k => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k })); }, rel2 = k => { window.dispatchEvent(new KeyboardEvent('keyup', { key: k })); };
       const mk = (parent, cls, html, css, down, up) => {
         const b = document.createElement('div'); b.className = 'b ' + cls; b.innerHTML = html; Object.assign(b.style, css); parent.appendChild(b);
@@ -4160,9 +4168,10 @@
       mk(root, '', '⟳<small>무기</small>', Object.assign(B(100, 168), { width: '54px', height: '54px' }), ...tap('0'));
       const menu = document.createElement('div'); menu.id = 'mmenu'; root.appendChild(menu);
       mk(root, '', '⋯<small>더보기</small>', Object.assign(B(190, 30), { width: '54px', height: '54px' }), () => { menu.style.display = menu.style.display === 'grid' ? 'none' : 'grid'; });
-      const items = [['수류탄', '💣', 'g'], ['TNT', '🧨', 't'], ['대시', '💨', 'f'], ['불릿', '⏱', 'q'], ['훅', '🪝', 'c'], ['차키', '🔑', 'l'], ['주차', '🅿️', 'k'], ['ATM', '🏧', 'x'], ['폭탄', '☢️', 'n'], ['지도', '🗺', 'm'], ['상점', '🛒', 'u'], ['스코프', '🔭', 'z'], ['경적', '📯', 'h', 1], ['인사', '👋', 'b'], ['채팅', '💬', 0], ['PvP창', '👥', 'p']];
+      const items = [['수류탄', '💣', 'g'], ['TNT', '🧨', 't'], ['대시', '💨', 'f'], ['불릿', '⏱', 'q'], ['훅', '🪝', 'c'], ['차키', '🔑', 'l'], ['주차', '🅿️', 'k'], ['ATM', '🏧', 'x'], ['폭탄', '☢️', 'n'], ['지도', '🗺', 'm'], ['상점', '🛒', 'u'], ['스코프', '🔭', 'z'], ['경적', '📯', 'h', 1], ['인사', '👋', 'b'], ['채팅', '💬', 0], ['방·접속자', '🌐', 1]];
       for (const [n, ic, k, h] of items) {
         if (k === 0) mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; openChat(); });
+        else if (k === 1) mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; document.body.classList.toggle('mpon'); });
         else if (h) mk(menu, '', ic + '<small>' + n + '</small>', {}, ...hold(k));
         else mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; window.dispatchEvent(new KeyboardEvent('keydown', { key: k })); window.dispatchEvent(new KeyboardEvent('keyup', { key: k })); });
       }
@@ -4175,7 +4184,7 @@
         if (!okT(e)) return;
         for (const t of e.changedTouches) {
           if (stId === null && t.clientX < innerWidth * 0.42 && t.clientY > innerHeight * 0.18) {
-            stId = t.identifier; ox = t.clientX; oy = t.clientY; stick.style.display = 'block'; stick.style.left = (ox - 65) + 'px'; stick.style.top = (oy - 65) + 'px'; stick.firstChild.style.transform = 'translate(0,0)';
+            stId = t.identifier; ox = t.clientX; oy = t.clientY; stick.style.display = 'block'; stick.style.opacity = '1'; stick.style.left = (ox - 65) + 'px'; stick.style.top = (oy - 65) + 'px'; stick.firstChild.style.transform = 'translate(0,0)';
           } else if (lookId === null && t.clientX >= innerWidth * 0.42) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; }
         }
         initAudio(); e.preventDefault();
@@ -4191,7 +4200,7 @@
       }, { passive: false });
       const endT = e => {
         for (const t of e.changedTouches) {
-          if (t.identifier === stId) { stId = null; stick.style.display = 'none'; setKeys(0, 0); }
+          if (t.identifier === stId) { stId = null; stickIdle(); setKeys(0, 0); }
           if (t.identifier === lookId) lookId = null;
         }
       };
@@ -4201,7 +4210,7 @@
       const rot = document.createElement('div'); rot.id = 'mrot'; rot.textContent = '📱 가로로 돌리면 훨씬 편해요'; document.body.appendChild(rot);
       const chk = () => { rot.style.display = innerHeight > innerWidth ? 'block' : 'none'; }; addEventListener('resize', chk); addEventListener('orientationchange', chk); chk();
       // 패널·지도·상점이 열리면 조작 해제
-      setInterval(() => { if (overlayOpen() && (stId !== null || lookId !== null || fireId !== null)) { stId = lookId = fireId = null; stick.style.display = 'none'; setKeys(0, 0); mdown = 0; } }, 300);
+      setInterval(() => { if (overlayOpen() && (stId !== null || lookId !== null || fireId !== null)) { stId = lookId = fireId = null; stickIdle(); setKeys(0, 0); mdown = 0; } }, 300);
       setTimeout(() => msg('📱 터치 조작: 왼쪽 드래그=이동 · 오른쪽 드래그=시점 · 🔫 발사 · ⋯ 더보기'), 3500);
     }
     if (isTouch) mobileInit();
