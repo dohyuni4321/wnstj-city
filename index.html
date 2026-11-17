@@ -438,7 +438,9 @@
     for (const [qx, qz, hx, hz] of PG_COL) if (Math.abs(lx - qx) < hx + r && Math.abs(ly - qz) < hz + r) return true;
     return false;
   }
+  let arenaCr = null;
   function solid(x, y, r) {
+    if (arenaCr) for (const c of arenaCr) if (Math.abs(x - c.x) < c.s + r && Math.abs(y - c.y) < c.s + r) return true;
     const b = bAt(x, y); if (!b) return !inW(x, y);
     if (b.walls && wallTop(b, x, y, r) > 0) return true;
     if (b.pg) return pgHit(b, x, y, Math.max(3, r));
@@ -447,7 +449,7 @@
     const lx = x - b.i * B, ly = y - b.j * B, m = R + 10 - r;
     return lx > m && lx < B - m && ly > m && ly < B - m;
   }
-  const bh = (x, y) => { const b = bAt(x, y); if (!b) return 0; const w = b.walls ? wallTop(b, x, y, 0) : 0; const h = !b.park && !b.pg && b.h && solid(x, y, 0) ? b.h : 0; return w > h ? w : h; };
+  const bh = (x, y) => { if (arenaCr) for (const c of arenaCr) if (Math.abs(x - c.x) < c.s && Math.abs(y - c.y) < c.s) return c.h; const b = bAt(x, y); if (!b) return 0; const w = b.walls ? wallTop(b, x, y, 0) : 0; const h = !b.park && !b.pg && b.h && solid(x, y, 0) ? b.h : 0; return w > h ? w : h; };
   const pS = (x, y) => MP.pS(x, y);
 
   // ============================================================================
@@ -2761,7 +2763,7 @@
     // ---------------------------------------------------------------- 네트워크
     function go(code) {
       if (code === ARENA && !own.pvp) { addFeed('⚔️ 방 WWWWW는 PvP 모드를 산 사람만 들어올 수 있어요 (상점 $500,000)', '#f66'); msg('PvP 모드를 먼저 사야 입장할 수 있어요'); code = myCode; }
-      if (code !== ARENA) arenaIn = false;
+      if (code !== ARENA) { arenaIn = false; arenaOff(); }
       if (ride) exitRide(true);
       if (ch) { try { sb.removeChannel(ch); } catch (e) {} ch = null; }
       for (const id of [...remotes.keys()]) dropRemote(id, true);
@@ -3859,15 +3861,38 @@
       for (let i = 0; i < 40; i++) { const x = AC + rnd(-AH + 60, AH - 60), y = AC + rnd(-AH + 60, AH - 60); if (!solid(x, y, 14)) { P.x = x; P.y = y; return; } }
       P.x = AC; P.y = AC;
     }
+    let arenaG = null, arenaList = null; const medk = [];
+    function arenaBuild() {
+      if (arenaG) return; arenaG = new THREE.Group();
+      const wm = new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }), L = AH * 2;
+      for (const [x, y, w, d] of [[AC, AC - AH, L, 6], [AC, AC + AH, L, 6], [AC - AH, AC, 6, L], [AC + AH, AC, 6, L]]) { const m = bx(w, 300, d, wm); m.position.set(x, 150, y); arenaG.add(m); }
+      const cm = new THREE.MeshBasicMaterial({ color: 0xd9822b }), tm = new THREE.MeshBasicMaterial({ color: 0xffd23f });
+      let sd = 7; const r2 = () => (sd = (sd * 16807) % 2147483647) / 2147483647; const list = [];
+      for (let i = 0; i < 200 && list.length < 18; i++) {
+        const x = AC + (r2() * 2 - 1) * (AH - 110), y = AC + (r2() * 2 - 1) * (AH - 110);
+        if (solid(x, y, 46) || list.some(q => Math.hypot(q.x - x, q.y - y) < 120)) continue; list.push({ x, y, s: 22, h: 34 });
+      }
+      for (const c of list) { const m = bx(44, 34, 44, cm); m.position.set(c.x, 17, c.y); arenaG.add(m); const t = bx(46, 3, 46, tm); t.position.set(c.x, 35, c.y); arenaG.add(t); }
+      arenaList = list;
+      const gm = new THREE.MeshBasicMaterial({ color: 0x35e07a });
+      for (const [ox, oy] of [[-300, -300], [300, -300], [-300, 300], [300, 300], [0, 0]]) {
+        let x = AC + ox, y = AC + oy; for (let k = 0; k < 30 && (solid(x, y, 30) || list.some(q => Math.hypot(q.x - x, q.y - y) < 50)); k++) { x += 40; }
+        const g = new THREE.Group(), a = bx(18, 6, 6, gm), b2 = bx(6, 6, 18, gm); g.add(a, b2); g.position.set(x, 14, y); arenaG.add(g); medk.push({ x, y, m: g, t: 0 });
+      }
+      sc.add(arenaG);
+    }
+    function arenaOff() { arenaCr = null; if (arenaG) arenaG.visible = false; }
     function arenaEnter() {
-      if (arenaIn) return; arenaIn = true; ksc.clear(); php = 100; pvShield = 5;
+      if (arenaIn) return; arenaIn = true;
+      arenaBuild(); arenaCr = arenaList; arenaG.visible = true; ksc.clear(); php = 100; pvShield = 5;
       if (ride) exitRide(true);
       if (!P.onFoot && P.car) { const c = P.car; c.type = 'k'; c.v = 0; P.car = null; P.onFoot = true; }
       P.z = 0; P.roof = null; P.climb = 0; P.gh = null; heat = 0; arenaSpawn();
-      title('⚔️ PvP 아레나', 'PvP가 항상 켜져 있어요 · 경찰 없음 · 죽으면 돈 10%(최대 $100,000)', '#ff5a5a');
+      title('⚔️ PvP 아레나', '붉은 벽 안이 아레나예요 · 초록 십자가 = 체력 회복 · 죽으면 돈 10%(최대 $100,000)', '#ff5a5a');
     }
-    function arenaTick() {
+    function arenaTick(dt) {
       heat = 0; bust = 0;
+      for (const k of medk) { if (k.t > 0) k.t -= dt; k.m.visible = k.t <= 0; k.m.rotation.y += dt * 2; if (k.t <= 0 && P.onFoot && php < 100 && Math.hypot(k.x - P.x, k.y - P.y) < 30) { php = 100; k.t = 15; msg('💚 체력 회복!'); } }
       const o = P.onFoot ? P : (P.car || P); let hit = false;
       if (o.x < AC - AH) { o.x = AC - AH; hit = true; } if (o.x > AC + AH) { o.x = AC + AH; hit = true; }
       if (o.y < AC - AH) { o.y = AC - AH; hit = true; } if (o.y > AC + AH) { o.y = AC + AH; hit = true; }
@@ -3913,7 +3938,7 @@
       return false;
     }
     function v4Tick(dt) {
-      if (isArena()) arenaTick();
+      if (isArena()) arenaTick(dt);
       if (!pvpOn()) { php = 100; pvShield = 0; hurtT = 0; } else { if (pvShield > 0) pvShield -= dt; if (hurtT > 0) hurtT -= dt; if (php < 100 && performance.now() - phT > 6000) php = Math.min(100, php + 8 * dt); }
       if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money);  }
       stNear = null;
