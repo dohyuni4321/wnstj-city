@@ -2342,7 +2342,7 @@
     }
 
     ctx.font = '12px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowBlur = 4;
-    ctx.fillText('L 차키(호출) · K 내 차 주차 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · V 송금 · Y 슬롯', VW / 2, VH - 22);
+    ctx.fillText('L 차키(호출) · K 내 차 주차 · X ATM 송금 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · V 송금 · Y 슬롯', VW / 2, VH - 22);
     ctx.fillText('WASD 이동 · Shift 달리기 · Space 점프(차: 브레이크) · 클릭/X 사격 · 우클릭 조준 · R 장전 · E 탑승/털기/동승 · J 옥상 점프 · Enter 채팅', VW / 2, VH - 40);
 
     if (tt > 0) { ctx.globalAlpha = Math.min(1, tt); ctx.font = 'bold 24px system-ui'; ctx.shadowBlur = 6; ctx.fillText(toast, VW / 2, 70); ctx.globalAlpha = 1; }
@@ -2634,10 +2634,7 @@
     }
     function nearestFriend(maxD) { let best = null, bd = maxD; for (const r of remotes.values()) { const d = Math.hypot(r.x - P.x, r.y - P.y); if (d < bd) { bd = d; best = r; } } return best; }
     function giveMoney() {
-      const r = nearestFriend(90); if (!r) { msg('근처에 친구가 없습니다 (V: $1,000 송금)'); return; }
-      const amt = Math.min(1000, money); if (amt <= 0) { msg('돈이 없습니다'); return; }
-      money -= amt; msg(`💸 ${r.name} 님에게 $${amt.toLocaleString()} 송금`); playSound('cash');
-      send('reward', { to: r.id, amt, text: `💸 ${myName} 님이 $${amt.toLocaleString()} 보냈습니다` });
+      msg('💸 송금은 이제 ATM 앞에서 X 키로 해요 (방에 접속 중인 사람을 골라 금액 입력)');
     }
     let slotT = 0;
     function slot() {
@@ -3389,14 +3386,14 @@
 
 
     // ---------------------------------------------------------------- 닉네임별 저장 (Supabase cc_profiles)
-    let profReady = false, profSig = '', profT = performance.now(), profBusy = false;
+    let profReady = false, profSig = '', profT = performance.now(), profBusy = false, admSeq = 0, admMiss = 0, admBusy = false;
     async function loadProfile() {
       if (!sb || guest) return; const nm = myName; profReady = false;
       try {
-        const { data, error } = await sb.from('cc_profiles').select('money,own').eq('name', nm).maybeSingle();
+        const { data, error } = await sb.from('cc_profiles').select('money,own,adm_seq').eq('name', nm).maybeSingle();
         if (nm !== myName || error) return;
         if (data) {
-          money = Math.max(0, Number(data.money) || 0);
+          money = Math.max(0, Number(data.money) || 0); admSeq = Number(data.adm_seq) || 0; admMiss = 0;
           for (const k of Object.keys(own)) delete own[k]; Object.assign(own, data.own || {}); own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
           LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money));
           if (wi >= 6 && !own[wi]) wi = 0;
@@ -3413,6 +3410,28 @@
       try { await sb.from('cc_profiles').upsert({ name: myName, money: Math.max(0, Math.round(money)), own, updated_at: new Date().toISOString() }); } catch (e) { profSig = ''; }
       profBusy = false;
     }
+    // 관리자 수정 즉시 반영 (3초마다 확인)
+    async function admPoll() {
+      if (!sb || guest || !profReady || admBusy || document.hidden) return; admBusy = true; const nm = myName;
+      try {
+        const { data, error } = await sb.from('cc_profiles').select('adm_seq,adm').eq('name', nm).maybeSingle();
+        if (nm !== myName || error) return;
+        if (!data) { if (++admMiss >= 2) { profReady = false; addFeed('⚠ 관리자가 이 계정 이름을 바꾸거나 삭제했어요 · 새로고침해 주세요 (저장 중지)', '#f66'); msg('관리자가 계정을 바꿨어요 · 새로고침해 주세요'); } return; }
+        admMiss = 0;
+        if ((Number(data.adm_seq) || 0) > admSeq && data.adm) {
+          admSeq = Number(data.adm_seq) || 0; const a = data.adm, had = new Set(Object.keys(own));
+          if (a.money !== undefined) money = Math.max(0, Number(a.money) || 0);
+          if (a.own) {
+            for (const k of Object.keys(own)) delete own[k]; Object.assign(own, a.own); own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
+            for (let i = 6; i < WP.length; i++) if (own[i] && !had.has(String(i))) am[i] = WP[i].mag;
+            if (wi >= 6 && !own[wi]) wi = 0;
+          }
+          LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money)); profSig = JSON.stringify([Math.round(money), own]);
+          title('🛠 관리자 수정', `돈 $${Math.round(money).toLocaleString()} · 무기/강화가 바뀌었어요`, '#ffd23f'); addFeed('🛠 관리자가 내 계정을 수정했어요', '#ffd23f'); playSound('cash'); if (shopOpen) renderShop();
+        }
+      } catch (e) {} finally { admBusy = false; }
+    }
+    setInterval(admPoll, 3000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveProfile(true); });
     window.addEventListener('pagehide', () => saveProfile(true));
 
@@ -3606,7 +3625,38 @@
       else if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); closeWpIn(); }
     });
     for (const ev of ['mousedown', 'mouseup', 'click']) wpEl.addEventListener(ev, e => e.stopPropagation());
-    const panels = { deal: dealEl, enh: enhEl, keys: keysEl };
+    // ---------------------------------------------------------------- 🏧 ATM 송금 (ATM 앞에서 X)
+    (() => { const st = document.createElement('style'); st.textContent = `.v4p.atm .bx{width:min(520px,95vw);border-color:rgba(76,217,138,.6)}.v4p.atm .hd b{color:#4cd98a}
+      .atp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:6px 0;border-radius:11px;background:rgba(255,255,255,.06);border:1.5px solid transparent;cursor:pointer;user-select:none}
+      .atp.sel{border-color:#4cd98a;background:rgba(76,217,138,.14)}.atp .d{width:12px;height:12px;border-radius:50%}.atp .m{margin-left:auto;color:#8b95a8;font-size:12px}
+      .at2{display:flex;gap:8px;margin-top:12px}.at2 input{flex:1;padding:10px 12px;border-radius:9px;border:1px solid #2a3140;background:#0b0e14;color:#fff;font:inherit}
+      .at2 .sb{padding:10px 16px;border-radius:9px;background:#4cd98a;color:#062;font-weight:800;cursor:pointer;user-select:none}.atr{min-height:20px;margin-top:8px;font-size:14px}`; document.head.appendChild(st); })();
+    const atmEl = mkPanel('atm', '<div class="bx"><div class="hd"><b>🏧 ATM 송금</b><span id="atMoney"></span></div><div id="atList"></div><div class="at2"><input id="atAmt" type="number" min="1" step="1" placeholder="보낼 금액 ($)"><div class="sb" id="atSend">송금하기</div></div><div class="atr" id="atRes"></div><div class="ft">같은 방에 접속 중인 사람을 눌러 고른 뒤 금액을 입력하고 송금하기 · Esc 닫기</div></div>');
+    let atSel = null, atSig = '';
+    function renderAtm(force) {
+      $('atMoney').textContent = '💰 ' + fmt(money);
+      const rs = [...remotes.values()], sig = rs.map(r => r.id + r.name).join('|') + '#' + atSel; if (!force && sig === atSig) return; atSig = sig;
+      if (atSel && !remotes.has(atSel)) atSel = null;
+      $('atList').innerHTML = rs.length ? rs.map(r => `<div class="atp${r.id === atSel ? ' sel' : ''}" data-id="${r.id}"><span class="d" style="background:${hex(r.color || 0xffffff)}"></span><b>${esc(r.name)}</b><span class="m">${r.id === atSel ? '선택됨' : '눌러서 선택'}</span></div>`).join('') : '<div style="padding:16px;text-align:center;color:#8b95a8">이 방에 접속 중인 다른 사람이 없어요</div>';
+    }
+    atmEl.addEventListener('click', e => { const t = e.target.closest('.atp'); if (t) { atSel = t.dataset.id; $('atRes').textContent = ''; renderAtm(true); } });
+    for (const ev of ['keydown', 'keyup', 'keypress']) $('atAmt').addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); $('atAmt').blur(); closePanel(); } else if (ev === 'keydown' && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); atSend(); } });
+    $('atSend').addEventListener('click', () => atSend());
+    function atSend() {
+      const out = (t, ok) => { $('atRes').style.color = ok ? '#4cd98a' : '#ff8f8f'; $('atRes').textContent = t; };
+      const r = atSel && remotes.get(atSel); if (!r) { out('받을 사람을 먼저 눌러 고르세요', 0); return; }
+      const amt = Math.floor(Number($('atAmt').value)); if (!(amt >= 1) || !Number.isFinite(amt)) { out('금액을 1 이상으로 입력하세요', 0); return; }
+      if (amt > Math.floor(money)) { out(`돈이 부족해요 (보유 $${Math.floor(money).toLocaleString()})`, 0); return; }
+      money -= amt; send('reward', { to: r.id, amt, text: `💸 ${myName} 님이 $${amt.toLocaleString()} 보냈습니다` });
+      out(`✅ ${r.name} 님에게 $${amt.toLocaleString()} 송금 완료`, 1); msg(`💸 ${r.name} 님에게 $${amt.toLocaleString()} 송금`); playSound('cash'); $('atAmt').value = ''; $('atMoney').textContent = '💰 ' + fmt(money);
+    }
+    function atmKey() {
+      const a = robs.find(r => r.k === 'a' && Math.hypot(P.x - r.x, P.y - r.y) < 45);
+      if (!a || !P.onFoot) { msg('ATM 앞에서 X: 송금'); return; }
+      if (!joined()) { msg('온라인 방에 접속해야 송금할 수 있어요'); return; }
+      atSel = null; atSig = ''; $('atRes').textContent = ''; openPanel('atm'); renderAtm(true);
+    }
+    const panels = { deal: dealEl, enh: enhEl, keys: keysEl, atm: atmEl };
     function v4Open() { return !!panel || wpBusy; }
     function openPanel(k) {
       if (document.pointerLockElement) document.exitPointerLock(); if (mapOpen) toggleMap(false); if (shopOpen) toggleShop(false);
@@ -3614,7 +3664,7 @@
       panel = k; mdown = false; panels[k].style.display = 'flex'; renderPanel();
     }
     function closePanel(quiet) { if (!panel) return; panels[panel].style.display = 'none'; panel = null; if (!quiet) setTimeout(reqLock, 0); }
-    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); }
+    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); else if (panel === 'atm') renderAtm(true); }
 
     // ---------------------------------------------------------------- 차 가게
     let dealHl = null;
@@ -4025,7 +4075,7 @@
       if (isArena()) arenaTick(dt);
       abTick(dt);
       if (!pvpOn()) { php = 100; pvShield = 0; hurtT = 0; } else { if (pvShield > 0) pvShield -= dt; if (hurtT > 0) hurtT -= dt; if (php < 100 && performance.now() - phT > 6000) php = Math.min(100, php + 8 * dt); }
-      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money);  }
+      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money); else if (panel === 'atm') renderAtm(false); }
       stNear = null;
       if (P.onFoot && !activeInterior && !P.roof && P.z < 8) {
         for (const st of stations) if (Math.hypot(P.x - st.x, P.y - st.y) < st.r) { stNear = st.k === 'deal' ? '🚗 차 가게 열기' : '⚒ 무기 강화소 열기'; break; }
@@ -4044,6 +4094,7 @@
       ctx.save(); ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.shadowBlur = 0;
       if (guest) { ctx.textAlign = 'center'; ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#ffd23f'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚠ ' + myName + ' · 게스트는 저장되지 않아요 — 닉네임 변경을 해주세요', VW / 2, 6); ctx.textAlign = 'left'; ctx.shadowBlur = 0; }
       if (pvpOn()) { ctx.fillStyle = '#0008'; ctx.fillRect(16, 192, 120, 10); ctx.fillStyle = php < 30 ? '#f33' : '#e55'; ctx.fillRect(16, 192, Math.max(0, php) * 1.2, 10); ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚔️ PvP ❤ ' + Math.ceil(php) + (pvShield > 0 ? ' 🛡' : ''), 16, 206); ctx.shadowBlur = 0; if (hurtT > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.35, hurtT)})`; ctx.fillRect(0, 0, VW, VH); } }
+      if (P.onFoot && !panel && !activeInterior && robs.some(r => r.k === 'a' && Math.hypot(P.x - r.x, P.y - r.y) < 45)) { ctx.textAlign = 'center'; ctx.font = 'bold 18px system-ui'; ctx.fillStyle = '#4cd98a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('[X] ATM 송금', VW / 2, VH / 2 + 112); ctx.textAlign = 'left'; ctx.shadowBlur = 0; }
       if (own.ab) { ctx.fillStyle = '#ffe27a'; ctx.font = 'bold 13px system-ui'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText(`☢️ ${ABN} ×${own.ab} · N 설치`, 16, 228); ctx.shadowBlur = 0; }
       if (isArena()) {
         const rows = [...ksc.entries()].sort((a, b) => b[1].k - a[1].k || a[1].d - b[1].d).slice(0, 6), x0 = VW - 190;
@@ -4068,6 +4119,7 @@
       if (document.activeElement === chatIn || document.activeElement === wpName) return;
       const k = e.key.toLowerCase(); if (e.repeat) return;
       if (k === 'l') toggleKeys();
+      if (k === 'x' && !panel) atmKey();
       if (k === 'n' && !panel) abPlace();
       if (k === 'k' && !panel) parkCar();
       else if (k === 'f' && !P.onFoot && P.car) refuel();
