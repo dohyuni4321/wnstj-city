@@ -1152,7 +1152,7 @@
       else {
         robbing.t += dt; heat = Math.max(heat, rt(r).h);
         if (robbing.t >= robbing.d) {
-          const g = Math.round(rnd(rt(r).min, rt(r).max) * (MP.has('bag') ? 1.3 : 1));
+          const g = Math.round(rnd(rt(r).min, rt(r).max) * 5 * (MP.has('bag') ? 1.3 : 1));
           money += g; heat = Math.min(5, heat + rt(r).hs); r.cool = r.k === 'a' ? 90 : 150; robbing = null;
           msg('💰 ' + rt(r).n + ' 강탈 성공! +$' + g.toLocaleString()); playSound('cash'); MP.loot(rt(r).n + ' 강탈 성공! +$' + g.toLocaleString() + ' (근처 팀원 30% 보너스)', g);
         }
@@ -3247,7 +3247,7 @@
       { id: 'pvp', ic: '⚔️', get n() { return 'PvP 모드' + (own.pvp ? (own.pvpOn ? ' · 켜짐' : ' · 꺼짐') : ''); }, get d() { return own.pvp ? '클릭하면 켜기/끄기 · 켠 사람끼리만 서로 데미지 · 죽으면 돈 10%를 처치한 사람이 가져가요' : 'PvP를 켠 사람끼리만 서로 공격 · 상점에서 언제든 켜고 끌 수 있어요'; }, p: 500000, perm: 'pvp', tg: () => own.pvpOn ? 'ON' : 'OFF' },
       { id: 'chute', ic: '🪂', n: '낙하산', d: '높은 곳에서 떨어져도 착지 충격 없음 (영구)', p: 60000, perm: 'chute' },
       { id: 'vest', ic: '🦺', n: '방탄조끼', d: '체포 벌금 절반 · PvP 피해 25% 감소 (영구)', p: 90000, perm: 'vest' },
-      { id: 'bag', ic: '💼', n: '현금 가방', d: '강도 보상 +30% (영구)', p: 120000, perm: 'bag' },
+      { id: 'bag', ic: '💼', n: '현금 가방', d: '강도 보상 +30% (영구) · 기본 강도 보상도 5배', p: 120000, perm: 'bag' },
       { id: 'can', ic: '🛢️', n: '휴대용 연료통', d: '타고 있는 차 연료를 가득 채움', p: 2500 },
       { id: 'nitro', ic: '🏎️', n: '니트로', d: '30초간 차 최고속도 +40%', p: 12000 }
     ];
