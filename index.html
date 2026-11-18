@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CRIME CITY 3D v3 · 멀티플레이</title>
   <style>
     :root {
@@ -2343,10 +2342,8 @@
     }
 
     ctx.font = '12px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowBlur = 4;
-    if (!document.body.classList.contains('mob')) {
-    ctx.fillText('L 차키(호출) · K 내 차 주차 · X ATM 송금 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · Y 슬롯', VW / 2, VH - 22);
+    ctx.fillText('L 차키(호출) · K 내 차 주차 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · V 송금 · Y 슬롯', VW / 2, VH - 22);
     ctx.fillText('WASD 이동 · Shift 달리기 · Space 점프(차: 브레이크) · 클릭/X 사격 · 우클릭 조준 · R 장전 · E 탑승/털기/동승 · J 옥상 점프 · Enter 채팅', VW / 2, VH - 40);
-    }
 
     if (tt > 0) { ctx.globalAlpha = Math.min(1, tt); ctx.font = 'bold 24px system-ui'; ctx.shadowBlur = 6; ctx.fillText(toast, VW / 2, 70); ctx.globalAlpha = 1; }
 
@@ -2608,7 +2605,7 @@
     rd.domElement.style.cursor = 'crosshair';
     let msX = 0, msY = 0, mouseUsed = false;
     window.addEventListener('mousemove', e => {
-      if (!locked) { if (document.body.classList.contains('mob')) return; msX = e.clientX; msY = e.clientY; mouseUsed = true; return; }
+      if (!locked) { msX = e.clientX; msY = e.clientY; mouseUsed = true; return; }
       if (mapOpen) { vcx = Math.max(0, Math.min(innerWidth, vcx + (e.movementX || 0))); vcy = Math.max(0, Math.min(innerHeight, vcy + (e.movementY || 0))); hoverR = pickFriend(vcx, vcy); return; }
       const dx = e.movementX || 0, dy = e.movementY || 0;
       if (P.onFoot) { if (!(tased > 0) && !P.climb) P.a += dx * 0.0032 * (scope ? 0.35 : 1); }
@@ -2637,7 +2634,10 @@
     }
     function nearestFriend(maxD) { let best = null, bd = maxD; for (const r of remotes.values()) { const d = Math.hypot(r.x - P.x, r.y - P.y); if (d < bd) { bd = d; best = r; } } return best; }
     function giveMoney() {
-      msg('💸 송금은 이제 ATM 앞에서 X 키로 해요 (방에 접속 중인 사람을 골라 금액 입력)');
+      const r = nearestFriend(90); if (!r) { msg('근처에 친구가 없습니다 (V: $1,000 송금)'); return; }
+      const amt = Math.min(1000, money); if (amt <= 0) { msg('돈이 없습니다'); return; }
+      money -= amt; msg(`💸 ${r.name} 님에게 $${amt.toLocaleString()} 송금`); playSound('cash');
+      send('reward', { to: r.id, amt, text: `💸 ${myName} 님이 $${amt.toLocaleString()} 보냈습니다` });
     }
     let slotT = 0;
     function slot() {
@@ -2959,10 +2959,9 @@
     let aimFr = -1, aimH = null;
     function aimPt() {
       if (aimFr === T) return aimH; aimFr = T; aimH = null;
-      const touchAim = document.body.classList.contains('mob');
-      if (!locked && !mouseUsed && !touchAim) return null;
+      if (!locked && !mouseUsed) return null;
       const rc = rd.domElement.getBoundingClientRect();
-      if (locked || touchAim) _ndc.set(0, 0); else _ndc.set((msX - rc.left) / rc.width * 2 - 1, -((msY - rc.top) / rc.height) * 2 + 1);
+      if (locked) _ndc.set(0, 0); else _ndc.set((msX - rc.left) / rc.width * 2 - 1, -((msY - rc.top) / rc.height) * 2 + 1);
       cm.updateMatrixWorld(); _ray.setFromCamera(_ndc, cm);
       const o = _ray.ray.origin, d = _ray.ray.direction, t0 = Math.hypot(o.x - P.x, o.z - P.y) + 6;
       let best = 1600;
@@ -3390,14 +3389,14 @@
 
 
     // ---------------------------------------------------------------- 닉네임별 저장 (Supabase cc_profiles)
-    let profReady = false, profSig = '', profT = performance.now(), profBusy = false, admSeq = 0, admMiss = 0, admBusy = false;
+    let profReady = false, profSig = '', profT = performance.now(), profBusy = false;
     async function loadProfile() {
       if (!sb || guest) return; const nm = myName; profReady = false;
       try {
-        const { data, error } = await sb.from('cc_profiles').select('money,own,adm_seq').eq('name', nm).maybeSingle();
+        const { data, error } = await sb.from('cc_profiles').select('money,own').eq('name', nm).maybeSingle();
         if (nm !== myName || error) return;
         if (data) {
-          money = Math.max(0, Number(data.money) || 0); admSeq = Number(data.adm_seq) || 0; admMiss = 0;
+          money = Math.max(0, Number(data.money) || 0);
           for (const k of Object.keys(own)) delete own[k]; Object.assign(own, data.own || {}); own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
           LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money));
           if (wi >= 6 && !own[wi]) wi = 0;
@@ -3414,28 +3413,6 @@
       try { await sb.from('cc_profiles').upsert({ name: myName, money: Math.max(0, Math.round(money)), own, updated_at: new Date().toISOString() }); } catch (e) { profSig = ''; }
       profBusy = false;
     }
-    // 관리자 수정 즉시 반영 (3초마다 확인)
-    async function admPoll() {
-      if (!sb || guest || !profReady || admBusy || document.hidden) return; admBusy = true; const nm = myName;
-      try {
-        const { data, error } = await sb.from('cc_profiles').select('adm_seq,adm').eq('name', nm).maybeSingle();
-        if (nm !== myName || error) return;
-        if (!data) { if (++admMiss >= 2) { profReady = false; addFeed('⚠ 관리자가 이 계정 이름을 바꾸거나 삭제했어요 · 새로고침해 주세요 (저장 중지)', '#f66'); msg('관리자가 계정을 바꿨어요 · 새로고침해 주세요'); } return; }
-        admMiss = 0;
-        if ((Number(data.adm_seq) || 0) > admSeq && data.adm) {
-          admSeq = Number(data.adm_seq) || 0; const a = data.adm, had = new Set(Object.keys(own));
-          if (a.money !== undefined) money = Math.max(0, Number(a.money) || 0);
-          if (a.own) {
-            for (const k of Object.keys(own)) delete own[k]; Object.assign(own, a.own); own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
-            for (let i = 6; i < WP.length; i++) if (own[i] && !had.has(String(i))) am[i] = WP[i].mag;
-            if (wi >= 6 && !own[wi]) wi = 0;
-          }
-          LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money)); profSig = JSON.stringify([Math.round(money), own]);
-          title('🛠 관리자 수정', `돈 $${Math.round(money).toLocaleString()} · 무기/강화가 바뀌었어요`, '#ffd23f'); addFeed('🛠 관리자가 내 계정을 수정했어요', '#ffd23f'); playSound('cash'); if (shopOpen) renderShop();
-        }
-      } catch (e) {} finally { admBusy = false; }
-    }
-    setInterval(admPoll, 3000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveProfile(true); });
     window.addEventListener('pagehide', () => saveProfile(true));
 
@@ -3629,38 +3606,7 @@
       else if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); closeWpIn(); }
     });
     for (const ev of ['mousedown', 'mouseup', 'click']) wpEl.addEventListener(ev, e => e.stopPropagation());
-    // ---------------------------------------------------------------- 🏧 ATM 송금 (ATM 앞에서 X)
-    (() => { const st = document.createElement('style'); st.textContent = `.v4p.atm .bx{width:min(520px,95vw);border-color:rgba(76,217,138,.6)}.v4p.atm .hd b{color:#4cd98a}
-      .atp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:6px 0;border-radius:11px;background:rgba(255,255,255,.06);border:1.5px solid transparent;cursor:pointer;user-select:none}
-      .atp.sel{border-color:#4cd98a;background:rgba(76,217,138,.14)}.atp .d{width:12px;height:12px;border-radius:50%}.atp .m{margin-left:auto;color:#8b95a8;font-size:12px}
-      .at2{display:flex;gap:8px;margin-top:12px}.at2 input{flex:1;padding:10px 12px;border-radius:9px;border:1px solid #2a3140;background:#0b0e14;color:#fff;font:inherit}
-      .at2 .sb{padding:10px 16px;border-radius:9px;background:#4cd98a;color:#062;font-weight:800;cursor:pointer;user-select:none}.atr{min-height:20px;margin-top:8px;font-size:14px}`; document.head.appendChild(st); })();
-    const atmEl = mkPanel('atm', '<div class="bx"><div class="hd"><b>🏧 ATM 송금</b><span id="atMoney"></span></div><div id="atList"></div><div class="at2"><input id="atAmt" type="number" min="1" step="1" placeholder="보낼 금액 ($)"><div class="sb" id="atSend">송금하기</div></div><div class="atr" id="atRes"></div><div class="ft">같은 방에 접속 중인 사람을 눌러 고른 뒤 금액을 입력하고 송금하기 · Esc 닫기</div></div>');
-    let atSel = null, atSig = '';
-    function renderAtm(force) {
-      $('atMoney').textContent = '💰 ' + fmt(money);
-      const rs = [...remotes.values()], sig = rs.map(r => r.id + r.name).join('|') + '#' + atSel; if (!force && sig === atSig) return; atSig = sig;
-      if (atSel && !remotes.has(atSel)) atSel = null;
-      $('atList').innerHTML = rs.length ? rs.map(r => `<div class="atp${r.id === atSel ? ' sel' : ''}" data-id="${r.id}"><span class="d" style="background:${hex(r.color || 0xffffff)}"></span><b>${esc(r.name)}</b><span class="m">${r.id === atSel ? '선택됨' : '눌러서 선택'}</span></div>`).join('') : '<div style="padding:16px;text-align:center;color:#8b95a8">이 방에 접속 중인 다른 사람이 없어요</div>';
-    }
-    atmEl.addEventListener('click', e => { const t = e.target.closest('.atp'); if (t) { atSel = t.dataset.id; $('atRes').textContent = ''; renderAtm(true); } });
-    for (const ev of ['keydown', 'keyup', 'keypress']) $('atAmt').addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); $('atAmt').blur(); closePanel(); } else if (ev === 'keydown' && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); atSend(); } });
-    $('atSend').addEventListener('click', () => atSend());
-    function atSend() {
-      const out = (t, ok) => { $('atRes').style.color = ok ? '#4cd98a' : '#ff8f8f'; $('atRes').textContent = t; };
-      const r = atSel && remotes.get(atSel); if (!r) { out('받을 사람을 먼저 눌러 고르세요', 0); return; }
-      const amt = Math.floor(Number($('atAmt').value)); if (!(amt >= 1) || !Number.isFinite(amt)) { out('금액을 1 이상으로 입력하세요', 0); return; }
-      if (amt > Math.floor(money)) { out(`돈이 부족해요 (보유 $${Math.floor(money).toLocaleString()})`, 0); return; }
-      money -= amt; send('reward', { to: r.id, amt, text: `💸 ${myName} 님이 $${amt.toLocaleString()} 보냈습니다` });
-      out(`✅ ${r.name} 님에게 $${amt.toLocaleString()} 송금 완료`, 1); msg(`💸 ${r.name} 님에게 $${amt.toLocaleString()} 송금`); playSound('cash'); $('atAmt').value = ''; $('atMoney').textContent = '💰 ' + fmt(money);
-    }
-    function atmKey() {
-      const a = robs.find(r => r.k === 'a' && Math.hypot(P.x - r.x, P.y - r.y) < 45);
-      if (!a || !P.onFoot) { msg('ATM 앞에서 X: 송금'); return; }
-      if (!joined()) { msg('온라인 방에 접속해야 송금할 수 있어요'); return; }
-      atSel = null; atSig = ''; $('atRes').textContent = ''; openPanel('atm'); renderAtm(true);
-    }
-    const panels = { deal: dealEl, enh: enhEl, keys: keysEl, atm: atmEl };
+    const panels = { deal: dealEl, enh: enhEl, keys: keysEl };
     function v4Open() { return !!panel || wpBusy; }
     function openPanel(k) {
       if (document.pointerLockElement) document.exitPointerLock(); if (mapOpen) toggleMap(false); if (shopOpen) toggleShop(false);
@@ -3668,7 +3614,7 @@
       panel = k; mdown = false; panels[k].style.display = 'flex'; renderPanel();
     }
     function closePanel(quiet) { if (!panel) return; panels[panel].style.display = 'none'; panel = null; if (!quiet) setTimeout(reqLock, 0); }
-    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); else if (panel === 'atm') renderAtm(true); }
+    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); }
 
     // ---------------------------------------------------------------- 차 가게
     let dealHl = null;
@@ -4079,7 +4025,7 @@
       if (isArena()) arenaTick(dt);
       abTick(dt);
       if (!pvpOn()) { php = 100; pvShield = 0; hurtT = 0; } else { if (pvShield > 0) pvShield -= dt; if (hurtT > 0) hurtT -= dt; if (php < 100 && performance.now() - phT > 6000) php = Math.min(100, php + 8 * dt); }
-      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money); else if (panel === 'atm') renderAtm(false); }
+      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money);  }
       stNear = null;
       if (P.onFoot && !activeInterior && !P.roof && P.z < 8) {
         for (const st of stations) if (Math.hypot(P.x - st.x, P.y - st.y) < st.r) { stNear = st.k === 'deal' ? '🚗 차 가게 열기' : '⚒ 무기 강화소 열기'; break; }
@@ -4098,7 +4044,6 @@
       ctx.save(); ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.shadowBlur = 0;
       if (guest) { ctx.textAlign = 'center'; ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#ffd23f'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚠ ' + myName + ' · 게스트는 저장되지 않아요 — 닉네임 변경을 해주세요', VW / 2, 6); ctx.textAlign = 'left'; ctx.shadowBlur = 0; }
       if (pvpOn()) { ctx.fillStyle = '#0008'; ctx.fillRect(16, 192, 120, 10); ctx.fillStyle = php < 30 ? '#f33' : '#e55'; ctx.fillRect(16, 192, Math.max(0, php) * 1.2, 10); ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('⚔️ PvP ❤ ' + Math.ceil(php) + (pvShield > 0 ? ' 🛡' : ''), 16, 206); ctx.shadowBlur = 0; if (hurtT > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.35, hurtT)})`; ctx.fillRect(0, 0, VW, VH); } }
-      if (P.onFoot && !panel && !activeInterior && robs.some(r => r.k === 'a' && Math.hypot(P.x - r.x, P.y - r.y) < 45)) { ctx.textAlign = 'center'; ctx.font = 'bold 18px system-ui'; ctx.fillStyle = '#4cd98a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('[X] ATM 송금', VW / 2, VH / 2 + 112); ctx.textAlign = 'left'; ctx.shadowBlur = 0; }
       if (own.ab) { ctx.fillStyle = '#ffe27a'; ctx.font = 'bold 13px system-ui'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText(`☢️ ${ABN} ×${own.ab} · N 설치`, 16, 228); ctx.shadowBlur = 0; }
       if (isArena()) {
         const rows = [...ksc.entries()].sort((a, b) => b[1].k - a[1].k || a[1].d - b[1].d).slice(0, 6), x0 = VW - 190;
@@ -4114,106 +4059,6 @@
       if (P.onFoot && stNear) { ctx.textAlign = 'center'; ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('[E] ' + stNear, VW / 2, VH / 2 + 80); }
       ctx.restore(); drawGuideHud();
     }
-
-    // ---------------------------------------------------------------- 📱 모바일 · 태블릿 조작 (터치 기기 자동 인식)
-    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || (window.matchMedia && matchMedia('(pointer:coarse)').matches);
-    function mobileInit() {
-      document.body.classList.add('mob');
-      const st = document.createElement('style'); st.textContent = `
-        :root{--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
-        body.mob{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
-        body.mob .touch-btn,body.mob #btn-shop,body.mob .v4b,body.mob #touch-controls{display:none!important}
-        body.mob #hotbar{bottom:calc(var(--sb) + 8px);max-width:44vw;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;gap:4px;padding:6px 3px 3px;-webkit-overflow-scrolling:touch}
-        body.mob #hotbar .sl.on{transform:none}body.mob #hotbar .k{font-size:10px;top:2px;left:4px}body.mob #hotbar .a{font-size:9.5px;top:2px;right:3px}
-        body.mob #hotbar .sl{width:48px;height:48px;flex:0 0 48px;border-radius:10px}body.mob #hotbar .sl .n{font-size:8px}body.mob #hotbar .sl{height:52px;flex-basis:48px}body.mob #hotbar svg{width:30px;height:21px;margin-top:-2px}body.mob #hotbar .ic{font-size:18px;margin-top:-2px}body.mob #hotbar .n{bottom:2px}
-        body.mob:not(.mpon) #mp{display:none!important}
-        #mob{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:system-ui,sans-serif}
-        #mob .b{position:absolute;pointer-events:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.1;color:#fff;font-weight:800;font-size:13px;background:rgba(20,24,34,.55);border:2px solid rgba(255,255,255,.35);backdrop-filter:blur(3px);-webkit-tap-highlight-color:transparent;touch-action:none}
-        #mob .b.on{background:rgba(255,210,63,.6);border-color:#ffd23f}#mob .b small{font-size:9px;font-weight:600;opacity:.85}
-        #mob .fire{background:rgba(255,60,60,.5);border-color:rgba(255,140,140,.8);font-size:15px}
-        #mob .stk{position:absolute;pointer-events:none;opacity:.55;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);display:none}
-        #mob .stk i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:rgba(255,255,255,.45)}
-        #mmenu{position:absolute;right:calc(var(--sr) + 14px);bottom:calc(var(--sb) + 210px);display:none;grid-template-columns:repeat(4,56px);gap:8px;pointer-events:auto;padding:10px;border-radius:16px;background:rgba(10,12,18,.82);border:1px solid rgba(255,255,255,.2)}
-        #mmenu .b{position:static;width:56px;height:56px;border-radius:12px;font-size:12px}
-        #mrot{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:95;padding:8px 14px;border-radius:12px;background:rgba(0,0,0,.75);color:#ffd23f;font:700 13px system-ui;display:none;pointer-events:none}`;
-      document.head.appendChild(st);
-      const root = document.createElement('div'); root.id = 'mob'; document.body.appendChild(root);
-      const stick = document.createElement('div'); stick.className = 'stk'; stick.style.width = stick.style.height = '130px'; stick.innerHTML = '<i></i>'; root.appendChild(stick);
-      const stickIdle = () => { stick.style.display = 'block'; stick.style.opacity = '.55'; stick.style.left = 'calc(var(--sl) + 36px)'; stick.style.top = (innerHeight - 190) + 'px'; stick.firstChild.style.transform = 'translate(0,0)'; };
-      stickIdle(); addEventListener('resize', () => { if (stId === null) stickIdle(); });
-      const act = k => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k })); }, rel2 = k => { window.dispatchEvent(new KeyboardEvent('keyup', { key: k })); };
-      const mk = (parent, cls, html, css, down, up) => {
-        const b = document.createElement('div'); b.className = 'b ' + cls; b.innerHTML = html; Object.assign(b.style, css); parent.appendChild(b);
-        b.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('on'); initAudio(); down && down(e); }, { passive: false });
-        const end = e => { e.preventDefault(); e.stopPropagation(); b.classList.remove('on'); up && up(e); };
-        b.addEventListener('touchend', end, { passive: false }); b.addEventListener('touchcancel', end, { passive: false });
-        return b;
-      };
-      const tap = k => [() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k })); window.dispatchEvent(new KeyboardEvent('keyup', { key: k })); }, null];
-      const hold = k => [() => act(k), () => rel2(k)];
-      const B = (bottom, right) => ({ bottom: `calc(var(--sb) + ${bottom}px)`, right: `calc(var(--sr) + ${right}px)` });
-      // 주 버튼
-      let lookId = null, lx = 0, ly = 0;
-      const look = (dx, dy) => {
-        if (P.onFoot) { if (!(tased > 0) && !P.climb) P.a += dx * 0.0058 * (scope ? 0.35 : 1); }
-        else ay = Math.max(-3.2, Math.min(3.2, ay + dx * 0.0065));
-        ap = Math.max(-1, Math.min(1, ap - dy * 0.004 * (scope ? 0.35 : 1)));
-      };
-      let fireId = null, fx = 0, fy = 0;
-      const fb = mk(root, 'fire', '🔫<small>발사</small>', Object.assign(B(22, 22), { width: '92px', height: '92px' }), e => { mdown = 1; const t = e.changedTouches[0]; fireId = t.identifier; fx = t.clientX; fy = t.clientY; }, () => { mdown = 0; fireId = null; });
-      fb.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === fireId) { look(t.clientX - fx, t.clientY - fy); fx = t.clientX; fy = t.clientY; } }, { passive: false });
-      mk(root, '', '⤒<small>점프</small>', Object.assign(B(30, 128), { width: '68px', height: '68px' }), ...hold(' '));
-      mk(root, '', 'E<small>상호작용</small>', Object.assign(B(124, 30), { width: '66px', height: '66px' }), ...tap('e'));
-      mk(root, '', 'R<small>장전</small>', Object.assign(B(124, 104), { width: '54px', height: '54px' }), ...tap('r'));
-      mk(root, '', '⟳<small>무기</small>', Object.assign(B(100, 168), { width: '54px', height: '54px' }), ...tap('0'));
-      const menu = document.createElement('div'); menu.id = 'mmenu'; root.appendChild(menu);
-      mk(root, '', '⋯<small>더보기</small>', Object.assign(B(190, 30), { width: '54px', height: '54px' }), () => { menu.style.display = menu.style.display === 'grid' ? 'none' : 'grid'; });
-      const items = [['수류탄', '💣', 'g'], ['TNT', '🧨', 't'], ['대시', '💨', 'f'], ['불릿', '⏱', 'q'], ['훅', '🪝', 'c'], ['차키', '🔑', 'l'], ['주차', '🅿️', 'k'], ['ATM', '🏧', 'x'], ['폭탄', '☢️', 'n'], ['지도', '🗺', 'm'], ['상점', '🛒', 'u'], ['스코프', '🔭', 'z'], ['경적', '📯', 'h', 1], ['인사', '👋', 'b'], ['채팅', '💬', 0], ['방·접속자', '🌐', 1]];
-      for (const [n, ic, k, h] of items) {
-        if (k === 0) mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; openChat(); });
-        else if (k === 1) mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; document.body.classList.toggle('mpon'); });
-        else if (h) mk(menu, '', ic + '<small>' + n + '</small>', {}, ...hold(k));
-        else mk(menu, '', ic + '<small>' + n + '</small>', {}, () => { menu.style.display = 'none'; window.dispatchEvent(new KeyboardEvent('keydown', { key: k })); window.dispatchEvent(new KeyboardEvent('keyup', { key: k })); });
-      }
-      // 가상 조이스틱(왼쪽) + 시점 드래그(오른쪽)
-      let stId = null, ox = 0, oy = 0;
-      const okT = e => (e.target === hud || e.target === rd.domElement || e.target === root) && !overlayOpen();
-      const setKeys = (dx, dy) => { keys.w = dy < -0.3 ? 1 : 0; keys.s = dy > 0.3 ? 1 : 0; keys.a = dx < -0.3 ? 1 : 0; keys.d = dx > 0.3 ? 1 : 0; };
-      window.addEventListener('touchstart', e => {
-        if (menu.style.display === 'grid' && !e.target.closest('#mmenu')) menu.style.display = 'none';
-        if (!okT(e)) return;
-        for (const t of e.changedTouches) {
-          if (stId === null && t.clientX < innerWidth * 0.42 && t.clientY > innerHeight * 0.18) {
-            stId = t.identifier; ox = t.clientX; oy = t.clientY; stick.style.display = 'block'; stick.style.opacity = '1'; stick.style.left = (ox - 65) + 'px'; stick.style.top = (oy - 65) + 'px'; stick.firstChild.style.transform = 'translate(0,0)';
-          } else if (lookId === null && t.clientX >= innerWidth * 0.42) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; }
-        }
-        initAudio(); e.preventDefault();
-      }, { passive: false });
-      window.addEventListener('touchmove', e => {
-        for (const t of e.changedTouches) {
-          if (t.identifier === stId) {
-            let dx = t.clientX - ox, dy = t.clientY - oy; const d = Math.hypot(dx, dy), m = 62; if (d > m) { dx = dx / d * m; dy = dy / d * m; }
-            stick.firstChild.style.transform = `translate(${dx}px,${dy}px)`; setKeys(dx / m, dy / m);
-          } else if (t.identifier === lookId) { look(t.clientX - lx, t.clientY - ly); lx = t.clientX; ly = t.clientY; }
-        }
-        if (stId !== null || lookId !== null) e.preventDefault();
-      }, { passive: false });
-      const endT = e => {
-        for (const t of e.changedTouches) {
-          if (t.identifier === stId) { stId = null; stickIdle(); setKeys(0, 0); }
-          if (t.identifier === lookId) lookId = null;
-        }
-      };
-      window.addEventListener('touchend', endT, { passive: false }); window.addEventListener('touchcancel', endT, { passive: false });
-      document.addEventListener('gesturestart', e => e.preventDefault());
-      // 세로 화면 안내
-      const rot = document.createElement('div'); rot.id = 'mrot'; rot.textContent = '📱 가로로 돌리면 훨씬 편해요'; document.body.appendChild(rot);
-      const chk = () => { rot.style.display = innerHeight > innerWidth ? 'block' : 'none'; }; addEventListener('resize', chk); addEventListener('orientationchange', chk); chk();
-      // 패널·지도·상점이 열리면 조작 해제
-      setInterval(() => { if (overlayOpen() && (stId !== null || lookId !== null || fireId !== null)) { stId = lookId = fireId = null; stickIdle(); setKeys(0, 0); mdown = 0; } }, 300);
-      setTimeout(() => msg('📱 터치 조작: 왼쪽 드래그=이동 · 오른쪽 드래그=시점 · 🔫 발사 · ⋯ 더보기'), 3500);
-    }
-    if (isTouch) mobileInit();
     // 모바일 버튼
     for (const [t, id, k, bot] of [['KEYS', 'btn-keys', 'l', 350], ['HOOK', 'btn-hook', 'c', 410]]) {
       const b = document.createElement('div'); b.id = id; b.className = 'v4b'; b.textContent = t; b.style.right = '20px'; b.style.bottom = bot + 'px'; document.body.appendChild(b);
@@ -4223,7 +4068,6 @@
       if (document.activeElement === chatIn || document.activeElement === wpName) return;
       const k = e.key.toLowerCase(); if (e.repeat) return;
       if (k === 'l') toggleKeys();
-      if (k === 'x' && !panel) atmKey();
       if (k === 'n' && !panel) abPlace();
       if (k === 'k' && !panel) parkCar();
       else if (k === 'f' && !P.onFoot && P.car) refuel();
