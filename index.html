@@ -1050,7 +1050,7 @@
   let robNear = null, robbing = null;
   const RT = {
     b: { n: '은행', d: 10, r: 40, f: 55, min: 6000, max: 9000, h: 3, hs: 2, off: 3, t: '금고 여는 중...', s: '🚨 금고 여는 중! 경보 울림' },
-    c: { n: '카지노 금고', d: 15, r: 40, f: 60, min: 15000, max: 25000, h: 3, hs: 2, off: 4, t: '카지노 금고 해킹 중...', s: '🎰 카지노 금고 해킹 시작! 경비 출동' },
+    c: { n: '뽑기방 경품 창고', d: 15, r: 40, f: 60, min: 15000, max: 25000, h: 3, hs: 2, off: 4, t: '경품 창고 해킹 중...', s: '🧸 뽑기방 경품 창고 해킹 시작! 경비 출동' },
     j: { n: '보석상', d: 7, r: 36, f: 52, min: 3000, max: 5200, h: 3, hs: 1, off: 2, t: '보석 쓸어담는 중...', s: '💎 진열장 깨는 중! 경보 울림' },
     a: { n: 'ATM', d: 3, r: 24, f: 36, min: 300, max: 900, h: 1, hs: 0.5, off: 0, t: 'ATM 해킹 중...', s: '🏧 ATM 해킹 중...' },
     g: { n: '주유소', d: 4, r: 30, f: 45, min: 1200, max: 2000, h: 2, hs: 1, off: 0, t: '현금 챙기는 중...', s: '주유소 터는 중...' },
@@ -1064,7 +1064,7 @@
     ph: { n: '약국', d: 6, r: 30, f: 48, min: 2600, max: 5000, h: 2, hs: 1, off: 1, t: '약품 금고 여는 중...', s: '💊 약국 털이!' },
     po: { n: '우체국', d: 8, r: 34, f: 52, min: 4800, max: 7800, h: 3, hs: 2, off: 2, t: '우편 금고 여는 중...', s: '📮 우체국 습격! 경보 울림' }
   };
-  const RTI = { b: '🏦', c: '🎰', j: '💎', a: '🏧', g: '⛽', l: '🅿️', cs: '🏪', pw: '💍', sm: '🛒', gn: '🔫', el: '📺', br: '🍺', ph: '💊', po: '📮' };
+  const RTI = { b: '🏦', c: '🧸', j: '💎', a: '🏧', g: '⛽', l: '🅿️', cs: '🏪', pw: '💍', sm: '🛒', gn: '🔫', el: '📺', br: '🍺', ph: '💊', po: '📮' };
   const rt = r => RT[r.k] || RT.l;
   function mkBank(cx, cz, b) {
     for (const x of [-95, 95]) addWall(b, cx + x, cz - 32, 8, 140, 66); addWall(b, cx, cz - 100, 200, 10, 66); addWall(b, cx, cz - 80, 96, 34, 50); for (let k = 0; k < 6; k++) addWall(b, cx - 90 + k * 36, cz + 38, 14, 14, 64);
@@ -2342,7 +2342,7 @@
     }
 
     ctx.font = '12px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowBlur = 4;
-    ctx.fillText('L 차키(호출) · K 내 차 주차 · X ATM 송금 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · Y 슬롯', VW / 2, VH - 22);
+    ctx.fillText('L 차키(호출) · K 내 차 주차 · X ATM 송금 · C 그래플링 훅 · F 대시/주유 · P 마우스모드 · M 지도(웨이포인트·우클릭 안내) · U 상점 · 0/휠 특수무기 · G 수류탄 · T TNT · Q 불릿타임 · Y 인형뽑기', VW / 2, VH - 22);
     ctx.fillText('WASD 이동 · Shift 달리기 · Space 점프(차: 브레이크) · 클릭/X 사격 · 우클릭 조준 · R 장전 · E 탑승/털기/동승 · J 옥상 점프 · Enter 채팅', VW / 2, VH - 40);
 
     if (tt > 0) { ctx.globalAlpha = Math.min(1, tt); ctx.font = 'bold 24px system-ui'; ctx.shadowBlur = 6; ctx.fillText(toast, VW / 2, 70); ctx.globalAlpha = 1; }
@@ -2373,7 +2373,7 @@
   // MAIN GAME LOOP
   // ============================================================================
 
-  // ===== v2: 카지노 · 보석상 · ATM (고정 시드라 모두 같은 위치) =====
+  // ===== v2: 뽑기방 · 보석상 · ATM (고정 시드라 모두 같은 위치) =====
   {
     const neon = (txt, bg, fg, glow) => {
       const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
@@ -2386,7 +2386,7 @@
     const front = b => b.cz + (B - 2 * R - 20) / 2;
     const shop = (b, k) => {
       const cx = b.cx, fz = front(b), casino = k === 'c';
-      const sg = new THREE.Mesh(new THREE.PlaneGeometry(casino ? 150 : 110, casino ? 38 : 28), casino ? neon('CASINO', '#1a0526', '#ffd23f', '#ff3ccf') : neon('JEWELRY', '#04262b', '#7ff6ff', '#2fe0ff'));
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(casino ? 150 : 110, casino ? 38 : 28), casino ? neon('ARCADE', '#1a0526', '#ffd23f', '#ff3ccf') : neon('JEWELRY', '#04262b', '#7ff6ff', '#2fe0ff'));
       sg.position.set(cx, casino ? 52 : 40, fz + 2.2); sc.add(sg);
       const door = bx(casino ? 46 : 32, 26, 1.5, new THREE.MeshBasicMaterial({ color: casino ? 0x3a0a3f : 0x0c3a40 })); door.position.set(cx, 15, fz + 1.4); sc.add(door);
       const strip = new THREE.MeshBasicMaterial({ color: casino ? 0xff3ccf : 0x2fe0ff });
@@ -2638,7 +2638,7 @@
     }
     function slot() {
       const near = robs.find(r => r.k === 'c' && Math.hypot(P.x - r.x, P.y - r.y) < 70);
-      if (!near || !P.onFoot) { msg('카지노 입구에서 Y: 베팅'); return; }
+      if (!near || !P.onFoot) { msg('뽑기방 입구에서 Y: 인형뽑기'); return; }
       if (panel === 'cas') { closePanel(); return; }
       $('csRes').textContent = ''; openPanel('cas');
     }
@@ -3017,7 +3017,7 @@
       g.fillStyle = '#ffd23f'; g.fillText('나', x, y - 16);
       g.font = 'bold 18px system-ui'; g.fillStyle = '#fff'; g.fillText('🗺  도시 지도 — 친구·웨이포인트 클릭=TP · 내 아이콘 클릭=웨이포인트 저장(최대 3) · 우클릭=안내하기 (M / Esc)', w / 2, Math.max(18, oy - 14));
       g.font = '12px system-ui'; g.fillStyle = 'rgba(255,255,255,.75)';
-      g.fillText('🪖 군사기지  🎰 카지노  🚗 차 가게  ⚒ 무기 강화소  ⛽ 주유소  P 주차장  🏦 은행  💎 보석상  🏪🛒🍺💊📮 털이 가게  ●파랑 경찰', w / 2, Math.min(h - 10, oy + S + 16));
+      g.fillText('🪖 군사기지  🧸 뽑기방  🚗 차 가게  ⚒ 무기 강화소  ⛽ 주유소  P 주차장  🏦 은행  💎 보석상  🏪🛒🍺💊📮 털이 가게  ●파랑 경찰', w / 2, Math.min(h - 10, oy + S + 16));
       v4MapTop(g);
       if (locked) { g.save(); g.translate(vcx, vcy); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 17); g.lineTo(4.5, 13); g.lineTo(8, 20); g.lineTo(10.5, 19); g.lineTo(7, 12); g.lineTo(12.5, 12); g.closePath(); g.fill(); g.stroke(); g.restore(); }
     }
@@ -3531,7 +3531,7 @@
         const nr = [...remotes.values()].find(r => !r.onFoot && !r.rd && Math.hypot(r.x - P.x, r.y - P.y) < 48);
         if (nr) { ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui'; ctx.fillText(`[E] ${nr.name} 님 차에 동승`, VW / 2, VH / 2 + 50); }
         const cz = robs.find(r => r.k === 'c' && Math.hypot(P.x - r.x, P.y - r.y) < 70);
-        if (cz) { ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 16px system-ui'; ctx.fillText('[Y] 슬롯머신 $500', VW / 2, VH / 2 + 108); }
+        if (cz) { ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 16px system-ui'; ctx.fillText('[Y] 인형뽑기', VW / 2, VH / 2 + 108); }
       }
       if (locked) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '12px system-ui'; ctx.fillText('🖱 마우스 모드 (P 해제)', VW / 2, 80); }
       ctx.restore();
@@ -3670,22 +3670,22 @@
       out(`✅ ${r.name} 님에게 $${amt.toLocaleString()} 송금 완료`, 1); msg(`💸 ${r.name} 님에게 $${amt.toLocaleString()} 송금`); playSound('cash'); $('atAmt').value = ''; $('atMoney').textContent = '💰 ' + fmt(money);
     }
 
-    // ---------------------------------------------------------------- 🎰 카지노 베팅 (Y) — 성공 확률 30% → 건 돈의 2배, 실패 → 절반만 돌려받음 (기대값 95%)
+    // ---------------------------------------------------------------- 🧸 뽑기방 인형뽑기 (Y) — 성공 30% → 넣은 코인 2배, 실패 → 절반 돌려받음 (기대값 95%)
     const CAS_P = 0.3; let casT = 0;
-    const casEl = mkPanel('cas', '<div class="bx"><div class="hd"><b>🎰 카지노 베팅</b><span id="csMoney"></span></div><div style="font-size:13px;color:#cbd2e0;line-height:1.5;margin-bottom:8px">원하는 만큼 먼저 걸어요.<br>🟢 <b>성공(30%)</b> → 건 돈의 <b>2배</b>를 돌려받아요<br>🔴 <b>실패(70%)</b> → 건 돈의 <b>절반(÷2)</b>만 돌려받아요</div><div class="atq" id="csQ"></div><div class="at2"><input id="csAmt" type="number" min="100" step="1" placeholder="베팅 금액 ($, 최소 100)"><div class="sb" id="csGo" style="background:#ff3ccf;color:#fff">베팅하기</div></div><div class="csr" id="csRes"></div><div class="ft">Esc 닫기 · 카지노 입구 근처에서만 베팅할 수 있어요</div></div>');
+    const casEl = mkPanel('cas', '<div class="bx"><div class="hd"><b>🧸 뽑기방 · 인형뽑기</b><span id="csMoney"></span></div><div style="font-size:13px;color:#cbd2e0;line-height:1.5;margin-bottom:8px">원하는 만큼 코인을 먼저 넣어요.<br>🟢 <b>뽑기 성공(30%)</b> → 넣은 코인의 <b>2배</b> 경품 환전!<br>🔴 <b>아쉽게 실패(70%)</b> → 위로상으로 넣은 코인의 <b>절반(÷2)</b>을 돌려줘요</div><div class="atq" id="csQ"></div><div class="at2"><input id="csAmt" type="number" min="100" step="1" placeholder="넣을 코인 ($, 최소 100)"><div class="sb" id="csGo" style="background:#ff3ccf;color:#fff">뽑기!</div></div><div class="csr" id="csRes"></div><div class="ft">Esc 닫기 · 뽑기방 입구 근처에서만 할 수 있어요</div></div>');
     quick($('csQ'), $('csAmt'), () => money);
     for (const ev of ['keydown', 'keyup', 'keypress']) $('csAmt').addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); $('csAmt').blur(); closePanel(); } else if (ev === 'keydown' && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); casBet(); } });
     $('csGo').addEventListener('click', () => casBet());
     function casBet() {
       const out = (h, c) => { $('csRes').style.color = c; $('csRes').innerHTML = h; };
-      const near = robs.find(r => r.k === 'c' && Math.hypot(P.x - r.x, P.y - r.y) < 90); if (!near) { out('카지노 입구에서 멀어졌어요', '#ff8f8f'); return; }
+      const near = robs.find(r => r.k === 'c' && Math.hypot(P.x - r.x, P.y - r.y) < 90); if (!near) { out('뽑기방 입구에서 멀어졌어요', '#ff8f8f'); return; }
       const amt = Math.floor(Number($('csAmt').value)); if (!(amt >= 100) || !Number.isFinite(amt)) { out('최소 $100부터 걸 수 있어요', '#ff8f8f'); return; }
       if (amt > Math.floor(money)) { out(`돈이 부족해요 (보유 $${Math.floor(money).toLocaleString()})`, '#ff8f8f'); return; }
       if (performance.now() - casT < 900) return; casT = performance.now();
       money -= amt; const win = Math.random() < CAS_P, back = win ? amt * 2 : Math.floor(amt / 2); money += back;
       const net = back - amt; $('csMoney').textContent = '💰 ' + fmt(money);
-      if (win) { out(`🟢 성공! ×2<small>+$${net.toLocaleString()} (돌려받은 돈 $${back.toLocaleString()})</small>`, '#4cd98a'); playSound('cash'); msg(`🎰 성공! +$${net.toLocaleString()}`); if (net >= 1000000) { title('🎰 대박!', `${myName} +$${net.toLocaleString()}`, '#ffd23f'); event(`님이 카지노에서 $${net.toLocaleString()}을 땄습니다! 🎰`); } }
-      else { out(`🔴 실패 ÷2<small>-$${(-net).toLocaleString()} (돌려받은 돈 $${back.toLocaleString()})</small>`, '#ff8f8f'); playSound('shoot'); msg(`🎰 실패 -$${(-net).toLocaleString()}`); }
+      if (win) { out(`🧸 뽑기 성공! ×2<small>+$${net.toLocaleString()} (환전 $${back.toLocaleString()})</small>`, '#4cd98a'); playSound('cash'); msg(`🧸 뽑기 성공! +$${net.toLocaleString()}`); if (net >= 1000000) { title('🧸 대박 경품!', `${myName} +$${net.toLocaleString()}`, '#ffd23f'); event(`님이 뽑기방에서 대박 경품을 뽑았습니다! 🧸`); } }
+      else { out(`🧸 아쉽다… ÷2<small>-$${(-net).toLocaleString()} (위로상 $${back.toLocaleString()})</small>`, '#ff8f8f'); playSound('shoot'); msg(`🧸 아쉽다… -$${(-net).toLocaleString()}`); }
     }
     function renderCas() { $('csMoney').textContent = '💰 ' + fmt(money); }
     function atmKey() {
@@ -3941,7 +3941,7 @@
       const m = myMapPos(); if (Math.hypot(m[0] - cx, m[1] - cy) < 18) openWpIn();
     }
     mapC.addEventListener('contextmenu', e => { e.preventDefault(); mapPress(e.clientX, e.clientY, 2); });
-    // 지도 위 랜드마크 (군사기지 · 카지노 · 차 가게 · 무기 강화소 · 주유소) + 웨이포인트
+    // 지도 위 랜드마크 (군사기지 · 뽑기방 · 차 가게 · 무기 강화소 · 주유소) + 웨이포인트
     function badge(g, x, y, em, col, label, r) {
       g.save(); g.globalAlpha = 1; g.fillStyle = col; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke();
       g.fillStyle = '#fff'; g.font = `${Math.round(r * 1.15)}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(em, x, y + 1);
@@ -3951,7 +3951,7 @@
     function v4Map(g, ox, oy, s, S) {
       const pulse = 1 + Math.sin(T * 4) * 0.08;
       if (baseP) { const q = 264 * s; g.save(); g.strokeStyle = '#ff4d4d'; g.lineWidth = 2.5; g.setLineDash([6, 4]); g.strokeRect(ox + baseP.x * s - q / 2 - 4, oy + baseP.y * s - q / 2 - 4, q + 8, q + 8); g.restore(); badge(g, ox + baseP.x * s, oy + baseP.y * s, '🪖', '#b52222', '군사기지', 15 * pulse); }
-      for (const r of robs) if (r.k === 'c') badge(g, ox + r.x * s, oy + r.y * s, '🎰', '#c11fa8', '카지노', 12 * pulse);
+      for (const r of robs) if (r.k === 'c') badge(g, ox + r.x * s, oy + r.y * s, '🧸', '#c11fa8', '뽑기방', 12 * pulse);
       for (const st of stations) if (st.k === 'deal') badge(g, ox + st.x * s, oy + st.y * s, '🚗', '#0e8fb0', '차 가게', 13 * pulse); else badge(g, ox + st.x * s, oy + st.y * s, '⚒', '#d8741a', '무기 강화소', 13 * pulse);
       for (const q of gases) badge(g, ox + q.x * s, oy + q.y * s, '⛽', '#c9761a', '', 7);
       for (const b of lots) badge(g, ox + b.cx * s, oy + b.cz * s, 'P', '#3b5bd6', '', 6);
