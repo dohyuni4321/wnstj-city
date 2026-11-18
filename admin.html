@@ -119,7 +119,7 @@ async function rpc(fn, body) {
 // ---- 로그인
 async function login() {
   const v = $('pw').value; if (!v) return; $('go').disabled = true;
-  try { await rpc('cc_admin_check', { pw: v }); pw = v; $('login').classList.add('hide'); $('app').classList.remove('hide'); await refresh(); renderRows(); loop(); }
+  try { await rpc('cc_admin_list', { pw: v }); pw = v;   // cc_admin_check 는 직접 호출이 막혀 있어서, 비번을 검사하는 cc_admin_list 로 로그인 확인 $('login').classList.add('hide'); $('app').classList.remove('hide'); await refresh(); renderRows(); loop(); }
   catch (e) { toast(/wrong password/i.test(e.message) ? '비밀번호가 틀렸어요' : '로그인 실패: ' + e.message, 0); }
   $('go').disabled = false;
 }
