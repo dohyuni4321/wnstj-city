@@ -34,50 +34,11 @@
       pointer-events: none;
       z-index: 10;
     }
-    /* Touch / Mobile Controls Overlay */
-    #touch-controls {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 20;
-      display: none;
-    }
-    @media (max-width: 1024px) {
-      #touch-controls { display: block; }
-    }
-    .touch-btn {
-      position: absolute;
-      pointer-events: auto;
-      background: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-      backdrop-filter: blur(4px);
-      touch-action: manipulation;
-    }
-    .touch-btn:active {
-      background: rgba(255, 255, 255, 0.5);
-    }
   </style>
 </head>
 <body>
 
   <canvas id="hud"></canvas>
-  <div id="touch-controls">
-    <!-- Mobile D-Pad & Action Buttons -->
-    <div id="btn-enter" class="touch-btn" style="right: 20px; bottom: 90px; width: 60px; height: 60px;">E</div>
-    <div id="btn-fire" class="touch-btn" style="right: 90px; bottom: 30px; width: 70px; height: 70px; background: rgba(255,50,50,0.4);">FIRE</div>
-    <div id="btn-dash" class="touch-btn" style="right: 20px; bottom: 160px; width: 50px; height: 50px;">F</div>
-    <div id="btn-bullet" class="touch-btn" style="right: 80px; bottom: 160px; width: 50px; height: 50px;">Q</div>
-    <div id="btn-jump" class="touch-btn" style="right: 170px; bottom: 40px; width: 58px; height: 58px; background: rgba(80,180,255,0.4);">JUMP</div>
-    <div id="btn-map" class="touch-btn" style="right: 20px; bottom: 230px; width: 50px; height: 50px;">MAP</div>
-    <div id="btn-grenade" class="touch-btn" style="right: 140px; bottom: 160px; width: 50px; height: 50px;">G</div>
-  </div>
 
   <!-- Three.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -244,16 +205,6 @@
   window.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('blur', () => { mdown = 0; aim = 0; });
 
-  // Touch Support Bindings
-  document.getElementById('btn-jump').addEventListener('touchstart', (e)=>{ e.preventDefault(); keys[' '] = 1; MP.jump(); });
-  document.getElementById('btn-jump').addEventListener('touchend', (e)=>{ e.preventDefault(); keys[' '] = 0; });
-  document.getElementById('btn-map').addEventListener('touchstart', (e)=>{ e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })); });
-  document.getElementById('btn-enter').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (!MP.rideKey()) toggle(); });
-  document.getElementById('btn-fire').addEventListener('touchstart', (e)=>{ e.preventDefault(); mdown = 1; });
-  document.getElementById('btn-fire').addEventListener('touchend', (e)=>{ e.preventDefault(); mdown = 0; });
-  document.getElementById('btn-dash').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && dcd <= 0){ dsh = 0.18; dcd = 2.5; shake = 3; } });
-  document.getElementById('btn-bullet').addEventListener('touchstart', (e)=>{ e.preventDefault(); slow = !slow; });
-  document.getElementById('btn-grenade').addEventListener('touchstart', (e)=>{ e.preventDefault(); if (P.onFoot && gren > 0 && gcd <= 0){ gcd = 3; gren--; const gm = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), M(0x3a5f2a)); sc.add(gm); gr.push({ m: gm, x: P.x + Math.cos(P.a) * 10, y: P.y + Math.sin(P.a) * 10, z: 12 + P.z, vx: Math.cos(P.a) * 280, vy: Math.sin(P.a) * 280, vz: 140, t: 1.6 }); } });
 
   const M = c => new THREE.MeshLambertMaterial({ color: c });
   const bx = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -3242,9 +3193,11 @@
       const m = new THREE.Mesh(new THREE.SphereGeometry(13, 18, 14), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, depthWrite: false }));
       return m;
     }
+    // v20: 관리자 가격 덮어쓰기(PRICES) · 글로벌 한정 재고(GS) — Supabase cc_prices / cc_global_stock
+    const PRICES = {}, GS = { stock: {}, ok: false };
     const ITEMS = [
       { id: 'leg', ic: '👑', n: '천벌 (레전드)', d: '3발 · 맞춘 곳에 궤도 포격 · 십자 5연속 대폭발', p: 300000000, w: 20, gold: 1 },
-      { id: 'ab', ic: '☢️', get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, d: '1억 · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 켠 사람·안 켠 사람 모두 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요 (무적 포션 중이면 피해 없음)', p: 100000000 },
+      { id: 'ab', ic: '☢️', gs: 1, get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, get d() { const g = GS.stock.ab; return '전 서버·모든 방 공용 한정 재고 · 선착순 (' + (!GS.ok ? '재고 확인 중…' : g && g.stock > 0 ? '남은 ' + g.stock + '개' : '품절 · 관리자가 재고를 넣으면 구매 가능') + ') · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 켠 사람·안 켠 사람 모두 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요 (무적 포션 중이면 피해 없음)'; }, get p() { const g = GS.stock.ab; return g ? g.price : 100000000; } },
       { id: 'rail', ic: '⚡', n: '레일건', d: '한 방 350 데미지 · 초고속 탄', p: 45000, w: 7 },
       { id: 'flame', ic: '🌋', n: '화염방사기', d: '100발 불꽃 연사 · 키 0 / 휠로 선택', p: 35000, w: 9 },
       { id: 'god', ic: '🛡️', n: '무적 포션', d: '30초간 체포·테이저·차량 피해 무효', p: 8000 },
@@ -3252,7 +3205,7 @@
       { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 옥상까지 점프 · 낙하 충격 없음', p: 3000 },
       { id: 'jp', ic: '🎒', n: '제트팩', d: '공중에서 Space 꾹 → 비행 · 연료 자동 충전 (영구)', p: 300000, perm: 'jp' },
       { id: 'gh', ic: '🪝', n: '그래플링 훅', d: 'C 키: 조준한 건물·벽으로 끌려가기 (영구)', p: 150000, perm: 'gh' },
-      { id: 'jpu', ic: '⛽', get n() { return '제트팩 연료 업그레이드 Lv' + (own.jpu || 0) + '/5'; }, get d() { return own.jp ? '연료 용량 ' + jpMax() + ' → ' + (jpMax() + 50) + ' · 충전 속도 증가' : '먼저 제트팩을 구매하세요'; }, get p() { return JPU[Math.min(own.jpu || 0, 4)]; }, mx: () => (own.jpu || 0) >= 5 },
+      { id: 'jpu', ic: '⛽', get n() { return '제트팩 연료 업그레이드 Lv' + (own.jpu || 0) + '/5'; }, get d() { return own.jp ? '연료 용량 ' + jpMax() + ' → ' + (jpMax() + 50) + ' · 충전 속도 증가' : '먼저 제트팩을 구매하세요'; }, get p() { return PRICES.jpu !== undefined ? PRICES.jpu : JPU[Math.min(own.jpu || 0, 4)]; }, mx: () => (own.jpu || 0) >= 5 },
       { id: 'gren', ic: '💣', n: '수류탄 ×5', d: '8 / G로 투척', p: 1500 },
       { id: 'tnt', ic: '🧨', n: 'TNT ×3', d: '9 / T로 설치', p: 2500 },
       { id: 'ammo', ic: '📦', n: '탄약 전부 충전', d: '모든 무기 탄창 가득', p: 500 },
@@ -3271,6 +3224,57 @@
       { id: 'can', ic: '🛢️', n: '휴대용 연료통', d: '타고 있는 차 연료를 가득 채움', p: 2500 },
       { id: 'nitro', ic: '🏎️', n: '니트로', d: '30초간 차 최고속도 +40%', p: 12000 }
     ];
+    // ---------------------------------------------------------------- v20: 가격 덮어쓰기 + 글로벌 재고 동기화 (방 코드·서버와 무관하게 DB 하나를 공유)
+    CARS.forEach(d => { d.p0 = d.p; });
+    ITEMS.forEach(it => { const ds = Object.getOwnPropertyDescriptor(it, 'p'); if (ds && 'value' in ds) it.p0 = it.p; });
+    function applyPrices() {
+      for (const d of CARS) { const o = PRICES[d.id]; d.p = o !== undefined ? o : d.p0; }
+      for (const it of ITEMS) if (it.p0 !== undefined) { const o = PRICES[it.id]; it.p = o !== undefined ? o : it.p0; }
+    }
+    const GS_FAST = 100, GS_IDLE = 2000;   // 상점·차 가게가 열려 있으면 0.1초마다, 닫혀 있으면 2초마다 동기화
+    const sbRpc = (fn, body, ms) => {
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms || 4000);
+      return fetch(SB_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), signal: ctl.signal, cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); }).finally(() => clearTimeout(to));
+    };
+    let gsBusy = false, gsSig = '', gsBuying = false;
+    async function gsSync() {
+      if (gsBusy || document.hidden) return; gsBusy = true;
+      try {
+        const j = await sbRpc('cc_global_state'); if (!j || typeof j !== 'object') return;
+        const prevAb = GS.stock.ab ? GS.stock.ab.stock : null, firstOk = GS.ok;
+        for (const k of Object.keys(PRICES)) delete PRICES[k]; Object.assign(PRICES, j.prices || {});
+        GS.stock = j.stock || {}; GS.ok = true;
+        const sig = JSON.stringify([PRICES, GS.stock]);
+        if (sig !== gsSig) {
+          gsSig = sig; applyPrices();
+          const nowAb = GS.stock.ab ? GS.stock.ab.stock : 0;
+          if (firstOk && prevAb !== null && nowAb > prevAb) { title('☢️ 원자폭탄 입고!', `${ABN} ${nowAb}개 · 상점에서 선착순 구매 (전 서버 공용)`, '#ffd23f'); addFeed(`☢️ ${ABN} 재고 ${nowAb}개 입고 — 선착순!`, '#ffd23f'); }
+          if (shopOpen) renderShop(); if (panel === 'deal') renderDeal();
+        }
+      } catch (e) { } finally { gsBusy = false; }
+    }
+    (function gsLoop() { gsSync().finally(() => setTimeout(gsLoop, (shopOpen || panel === 'deal') ? GS_FAST : GS_IDLE)); })();
+    // 선착순 구매: 먼저 결제 → 서버가 행 잠금으로 재고 1개를 원자적으로 차감 → 실패하면 환불
+    async function buyGlobal(it) {
+      if (gsBuying) return;
+      await gsSync(); const g = GS.stock[it.id];
+      if (!GS.ok || !g) { msg('☢️ 서버에 연결 중이에요 · 잠시 후 다시 눌러 주세요'); return; }
+      if (g.stock <= 0) { msg('☢️ 품절! 관리자가 재고를 넣으면 선착순으로 살 수 있어요'); playSound('shoot'); renderShop(); return; }
+      const price = g.price; if (money < price) { msg(`돈이 부족해요 ($${(price - Math.round(money)).toLocaleString()} 더 필요)`); playSound('shoot'); return; }
+      gsBuying = true; money -= price;
+      let res = null; try { res = await sbRpc('cc_buy_global', { p_item: it.id, p_expected: price, p_buyer: myName }); } catch (e) { }
+      gsBuying = false;
+      if (res && res.ok) {
+        own[it.id] = (own[it.id] || 0) + 1; saveOwn(); playSound('cash'); if (GS.stock[it.id]) GS.stock[it.id].stock = res.stock;
+        event(`님이 ${it.n}을(를) 선착순으로 샀습니다! (남은 ${res.stock}개)`); msg(`${it.ic} ${it.n} 구매 완료  -$${price.toLocaleString()} · 남은 재고 ${res.stock}개`);
+      } else {
+        money += price; playSound('shoot');
+        msg(res && res.err === 'sold_out' ? '☢️ 선착순 마감! 방금 다른 사람이 가져갔어요 (돈은 그대로)' : res && res.err === 'price_changed' ? '가격이 바뀌었어요 · 다시 확인해 주세요 (돈은 그대로)' : '서버 오류로 구매하지 못했어요 (돈은 그대로)');
+        gsSync();
+      }
+      renderShop();
+    }
     const shopEl = document.createElement('div'); shopEl.id = 'shop';
     const shopCss = document.createElement('style');
     shopCss.textContent = `#shop{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.62);font-family:system-ui}
@@ -3287,31 +3291,29 @@
       #shop .ic{font-size:28px;width:36px;text-align:center} #shop .nm{font:700 14.5px system-ui} #shop .ds{font:12px system-ui;color:rgba(255,255,255,.62);margin-top:2px}
       #shop .pr{margin-left:auto;font:800 14px system-ui;color:#ffd23f;white-space:nowrap}
       #shop .ft{margin-top:10px;font:12px system-ui;color:rgba(255,255,255,.55);text-align:center}
-      #btn-shop{position:fixed;right:20px;bottom:290px;z-index:30;width:50px;height:50px;border-radius:50%;background:rgba(255,210,63,.45);color:#fff;font:700 12px system-ui;display:none;align-items:center;justify-content:center}
-      @media (pointer:coarse){#btn-shop{display:flex}}`;
+    `;
     document.head.appendChild(shopCss);
     shopEl.innerHTML = '<div class="bx"><div class="hd"><b>🛒 상점</b><span id="shopMoney"></span></div><div class="gr" id="shopGr"></div><div class="ft">클릭해서 구매 · 무기는 한 번 사면 계속 보유 · U / Esc 닫기</div></div>';
     document.body.appendChild(shopEl);
     for (const ev of ['mousedown', 'mouseup', 'click', 'touchstart']) shopEl.addEventListener(ev, e => { e.stopPropagation(); if (e.target === shopEl && ev === 'click') toggleShop(false); });
-    const sbtn = document.createElement('div'); sbtn.id = 'btn-shop'; sbtn.textContent = 'SHOP'; document.body.appendChild(sbtn);
-    sbtn.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); toggleShop(); }, { passive: false });
     function renderShop() {
       $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString();
       $('shopGr').innerHTML = ITEMS.map(it => {
-        const ow = (it.w && own[it.w]) || (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && money < it.p;
-        return `<div class="it${ow ? ' own' : no ? ' no' : ''}${it.gold ? ' gold' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : it.tg ? it.tg() : '보유 중') : '$' + it.p.toLocaleString()}</div></div>`;
+        const gsd = it.gs ? GS.stock[it.id] : null, so = !!it.gs && (!gsd || gsd.stock <= 0);
+        const ow = (it.w && own[it.w]) || (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && (so || money < it.p);
+        return `<div class="it${ow ? ' own' : no ? ' no' : ''}${it.gold ? ' gold' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}</div><div class="ds">${it.d}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : it.tg ? it.tg() : '보유 중') : so ? '품절' : (it.gs ? '남은 ' + gsd.stock + '개<br>' : '') + '$' + it.p.toLocaleString()}</div></div>`;
       }).join('');
     }
     shopEl.addEventListener('click', e => { const t = e.target.closest('.it'); if (t) buy(t.dataset.id); });
-    shopEl.addEventListener('touchend', e => { const t = e.target.closest('.it'); if (t) { e.preventDefault(); buy(t.dataset.id); } }, { passive: false });
     function toggleShop(v) {
       shopOpen = v === undefined ? !shopOpen : v;
       shopEl.style.display = shopOpen ? 'flex' : 'none';
-      if (shopOpen) { if (document.pointerLockElement) document.exitPointerLock(); if (mapOpen) toggleMap(false); closePanel(true); mdown = false; renderShop(); }
+      if (shopOpen) { if (document.pointerLockElement) document.exitPointerLock(); if (mapOpen) toggleMap(false); closePanel(true); mdown = false; renderShop(); gsSync(); }
       else setTimeout(reqLock, 0);
     }
     function buy(id) {
       const it = ITEMS.find(x => x.id === id); if (!it) return;
+      if (it.gs) { buyGlobal(it); return; }
       if (id === 'jpu') {
         if (!own.jp) { msg('먼저 제트팩을 구매하세요'); return; }
         if ((own.jpu || 0) >= 5) { msg('이미 최대 강화예요'); return; }
@@ -3626,8 +3628,7 @@
       .v4p .btn.o{background:#ff9a3d} .v4p .res{margin-top:8px;text-align:center;font:700 15px system-ui;min-height:20px}
       #wpIn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;display:none;padding:14px 16px;background:#12151d;border:1.5px solid #ffd23f;border-radius:14px;color:#fff;font:14px system-ui;box-shadow:0 20px 50px rgba(0,0,0,.6)}
       #wpIn input{display:block;margin-top:8px;width:260px;padding:8px 10px;border-radius:8px;border:1px solid #666;background:#0b0e14;color:#fff;font:15px system-ui}
-      .v4b{position:fixed;z-index:30;width:50px;height:50px;border-radius:50%;color:#fff;font:700 12px system-ui;display:none;align-items:center;justify-content:center;background:rgba(80,200,255,.4)}
-      @media (pointer:coarse){.v4b{display:flex}}`;
+    `;
     document.head.appendChild(v4css);
     const mkPanel = (cls, html) => { const e = document.createElement('div'); e.className = 'v4p ' + cls; e.innerHTML = html; document.body.appendChild(e); for (const ev of ['mousedown', 'mouseup', 'click', 'touchstart']) e.addEventListener(ev, x => { x.stopPropagation(); if (x.target === e && ev === 'click') closePanel(); }); return e; };
     const dealEl = mkPanel('deal', '<div class="bx"><div class="hd"><b>🚗 차 가게 — CAR SHOP</b><span id="dlMoney"></span></div><div class="gr" id="dlGr"></div><div class="ft">클릭해서 구매 · 산 차는 절대 부서지지 않아요 · L 차키로 어디서든 호출 · E / Esc 닫기</div></div>');
@@ -3700,7 +3701,7 @@
     function openPanel(k) {
       if (document.pointerLockElement) document.exitPointerLock(); if (mapOpen) toggleMap(false); if (shopOpen) toggleShop(false);
       if (panel) panels[panel].style.display = 'none';
-      panel = k; mdown = false; panels[k].style.display = 'flex'; renderPanel();
+      panel = k; mdown = false; panels[k].style.display = 'flex'; renderPanel(); if (k === 'deal') gsSync();
     }
     function closePanel(quiet) { if (!panel) return; panels[panel].style.display = 'none'; panel = null; if (!quiet) setTimeout(reqLock, 0); }
     function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); else if (panel === 'atm') renderAtm(true); else if (panel === 'cas') renderCas(); }
@@ -4061,7 +4062,7 @@
     const abOv = document.createElement('div'); abOv.id = 'abov'; abOv.innerHTML = '<div class="cl"><span>👏</span><span>👏</span></div><div class="tx"></div>'; document.body.appendChild(abOv);
     const abFl = document.createElement('div'); abFl.id = 'abfl'; document.body.appendChild(abFl);
     function abPlace() {
-      if (!own.ab) { msg(`☢️ ${ABN}이(가) 없어요 (상점 $100,000,000)`); return; }
+      if (!own.ab) { msg(`☢️ ${ABN}이(가) 없어요 (상점에서 선착순 한정 판매)`); return; }
       if (abBusy) { msg('☢️ 이미 발동 중이에요'); return; }
       if (!P.onFoot || P.climb) { msg('걸어서 땅에 서 있을 때 설치할 수 있어요'); return; }
       if (!joined()) { msg('온라인 방에서만 설치할 수 있어요'); return; }
@@ -4148,11 +4149,6 @@
       }
       if (P.onFoot && stNear) { ctx.textAlign = 'center'; ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('[E] ' + stNear, VW / 2, VH / 2 + 80); }
       ctx.restore(); drawGuideHud();
-    }
-    // 모바일 버튼
-    for (const [t, id, k, bot] of [['KEYS', 'btn-keys', 'l', 350], ['HOOK', 'btn-hook', 'c', 410]]) {
-      const b = document.createElement('div'); b.id = id; b.className = 'v4b'; b.textContent = t; b.style.right = '20px'; b.style.bottom = bot + 'px'; document.body.appendChild(b);
-      b.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); press(k); }, { passive: false });
     }
     window.addEventListener('keydown', e => {
       if (document.activeElement === chatIn || document.activeElement === wpName) return;

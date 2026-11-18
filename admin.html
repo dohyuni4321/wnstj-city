@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>CRIME CITY 관리자 · 가격/재고</title>
+<style>
+  :root{--bg:#0b0e14;--card:#12151d;--line:#232a39;--tx:#e8ecf5;--mut:#8b95a8;--gold:#ffd23f;--ok:#4cd98a;--bad:#ff6a6a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px 16px 80px}
+  h1{font-size:18px;margin:0 0 4px;color:var(--gold)} .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  input,button,select{font:inherit;color:var(--tx)}
+  input{background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+  input:focus{outline:none;border-color:var(--gold)}
+  button{background:#232a39;border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  button:hover{border-color:var(--gold)} button.pri{background:var(--gold);color:#2a1d00;border-color:var(--gold);font-weight:800}
+  button:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button.on{background:var(--gold);color:#2a1d00;border-color:var(--gold);font-weight:800}
+  table{width:100%;border-collapse:collapse} th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{color:var(--mut);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--card)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap} td input{width:150px;text-align:right}
+  tr.chg td{background:rgba(255,210,63,.08)} .tag{font-size:11px;padding:2px 6px;border-radius:6px;background:#232a39;color:var(--mut)}
+  .tag.ov{background:rgba(255,210,63,.18);color:var(--gold)}
+  .big{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums} .lbl{color:var(--mut);font-size:12px}
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+  .stat>div{background:#0b0e14;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  #msg{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:#12151d;border:1px solid var(--line);max-width:92vw;display:none;z-index:9}
+  #msg.ok{border-color:var(--ok);color:var(--ok)} #msg.bad{border-color:var(--bad);color:var(--bad)}
+  .hide{display:none!important} .scroll{max-height:62vh;overflow:auto}
+  @media (max-width:560px){td input{width:110px}}
+</style>
+</head>
+<body>
+
+<div id="login" class="card" style="max-width:420px;margin:12vh auto 0">
+  <h1>🛠 CRIME CITY 관리자</h1>
+  <div class="sub">가격 변경 · 원자폭탄 글로벌 재고</div>
+  <div class="row"><input id="pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" style="flex:1"><button class="pri" id="go">로그인</button></div>
+  <div class="sub" style="margin-top:10px">비밀번호는 이 탭 메모리에만 있고 저장되지 않아요. 틀리면 1.5초 지연돼요.</div>
+</div>
+
+<div id="app" class="hide">
+  <h1>🛠 CRIME CITY 관리자</h1>
+  <div class="sub">변경은 게임에 접속 중인 모든 방·모든 서버의 플레이어에게 즉시(상점·차 가게를 열어 둔 사람은 0.1초, 그 외는 2초 안에) 반영돼요.</div>
+  <div class="tabs"><button id="t1" class="on">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button></div>
+
+  <div id="p1">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <input id="q" placeholder="이름·ID 검색" style="flex:1;min-width:140px">
+        <select id="kind" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option value="all">전체</option><option value="car">🚗 차</option><option value="shop">🛒 상점</option></select>
+        <button class="pri" id="saveAll" disabled>변경 저장 (<span id="nchg">0</span>)</button>
+      </div>
+      <div class="sub">칸을 비우면 기본 가격으로 복구돼요. 0원도 가능해요. 최대 1조.</div>
+      <div class="scroll"><table><thead><tr><th>상품</th><th class="num">기본가</th><th class="num">현재가</th><th class="num">새 가격 ($)</th></tr></thead><tbody id="rows"></tbody></table></div>
+    </div>
+  </div>
+
+  <div id="p2" class="hide">
+    <div class="card">
+      <div class="lbl">☢️ 박수치기 가이아나 원자폭탄 — 전 서버·모든 방 공용 · 선착순 (0.1초 실시간)</div>
+      <div class="stat" style="margin-top:10px">
+        <div><div class="lbl">남은 재고</div><div class="big" id="sStock">–</div></div>
+        <div><div class="lbl">판매 가격</div><div class="big" id="sPrice" style="font-size:22px">–</div></div>
+        <div><div class="lbl">누적 판매</div><div class="big" id="sSold" style="font-size:22px">–</div></div>
+        <div><div class="lbl">마지막 구매자</div><div class="big" id="sBuyer" style="font-size:18px">–</div></div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="addN" type="number" min="1" step="1" placeholder="추가할 수량" style="width:140px">
+        <button class="pri" id="addGo">재고 추가 (입고)</button>
+        <span class="sub" style="margin:0">추가하면 접속 중인 모두에게 "입고!" 알림이 떠요</span>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="setN" type="number" min="0" step="1" placeholder="재고를 이 수로 맞추기" style="width:190px">
+        <button id="setGo">재고 설정</button>
+        <button id="zeroGo">품절 처리(0개)</button>
+      </div>
+      <div class="row">
+        <input id="priceN" type="number" min="0" step="1" placeholder="판매 가격 ($)" style="width:190px">
+        <button id="priceGo">가격 변경</button>
+        <span class="sub" style="margin:0">기본 $100,000,000</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="msg"></div>
+
+<script>
+const SB_URL = 'https://eyiweluikqptpltdbind.supabase.co';
+const SB_KEY = 'sb_publishable_2HSCefmudZ2dM39UsDhbjQ_xUdBlTHy';
+// 게임(index.html)의 CARS / ITEMS 기본 가격과 같아야 해요. 상품을 추가·삭제하면 여기도 고쳐 주세요.
+const CATALOG = [
+  ['car','x_city','시티 컴팩트',30000],['car','x_sedan','어반 세단',48000],['car','x_suv','하이랜드 SUV',65000],['car','x_jeep','오프로드 랭글러',80000],
+  ['car','x_pickup','파워 픽업',95000],['car','x_muscle','머슬 V8',130000],['car','x_coupe','레트로 쿠페',160000],['car','x_road','스파이더 로드스터',210000],
+  ['car','x_limo','블랙 리무진',260000],['car','x_super','라이트닝 슈퍼카',380000],['car','x_gt','카본 GT',520000],['car','x_hyper','플라즈마 하이퍼카',750000],
+  ['car','x_f1','포뮬러 레이서',1000000],['car','x_royal','로열 골드 에디션',1400000],['car','x_stealth','스텔스 프로토타입',2000000],
+  ['shop','leg','👑 천벌 (레전드)',300000000],['shop','rail','⚡ 레일건',45000],['shop','flame','🌋 화염방사기',35000],['shop','god','🛡️ 무적 포션',8000],
+  ['shop','spd','💨 스피드 포션',4000],['shop','jmp','🦘 슈퍼 점프 포션',3000],['shop','jp','🎒 제트팩',300000],['shop','gh','🪝 그래플링 훅',150000],
+  ['shop','jpu','⛽ 제트팩 연료 업그레이드 (모든 단계 동일가, 기본은 단계별 12000~80000)',12000],
+  ['shop','gren','💣 수류탄 ×5',1500],['shop','tnt','🧨 TNT ×3',2500],['shop','ammo','📦 탄약 전부 충전',500],['shop','fix','🔧 차량 수리',1500],
+  ['shop','bt','⏱️ 불릿타임 충전',800],['shop','clr','🕶️ 수배 지우기',5000],['shop','arc','🌩️ 번개총',120000],['shop','saw','🪚 회전톱',95000],
+  ['shop','hole','🕳️ 블랙홀 건',350000],['shop','stk','💣 끈끈이 폭탄총',110000],['shop','tele','🌀 텔레포트 건',180000],['shop','pvp','⚔️ PvP 모드',500000],
+  ['shop','chute','🪂 낙하산',60000],['shop','vest','🦺 방탄조끼',90000],['shop','bag','💼 현금 가방',120000],['shop','can','🛢️ 휴대용 연료통',2500],['shop','nitro','🏎️ 니트로',12000]
+];
+const $ = id => document.getElementById(id), fmt = n => '$' + Number(n).toLocaleString();
+let pw = '', cur = { prices: {}, stock: {} }, edits = {};
+
+function toast(t, ok) { const m = $('msg'); m.textContent = t; m.className = ok ? 'ok' : 'bad'; m.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => m.style.display = 'none', 3500); }
+async function rpc(fn, body) {
+  const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), cache: 'no-store' });
+  const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) { }
+  if (!r.ok) throw new Error(j && (j.message || j.hint) || ('HTTP ' + r.status));
+  return j;
+}
+
+// ---- 로그인
+async function login() {
+  const v = $('pw').value; if (!v) return; $('go').disabled = true;
+  try { await rpc('cc_admin_check', { pw: v }); pw = v; $('login').classList.add('hide'); $('app').classList.remove('hide'); await refresh(); renderRows(); loop(); }
+  catch (e) { toast(/wrong password/i.test(e.message) ? '비밀번호가 틀렸어요' : '로그인 실패: ' + e.message, 0); }
+  $('go').disabled = false;
+}
+$('go').onclick = login; $('pw').onkeydown = e => { if (e.key === 'Enter') login(); };
+
+// ---- 상태 읽기 (재고 탭은 0.1초 폴링)
+let busy = false;
+async function refresh() {
+  if (busy) return; busy = true;
+  try { const j = await rpc('cc_global_state'); cur = { prices: j.prices || {}, stock: j.stock || {} }; paintStock(); } catch (e) { } finally { busy = false; }
+}
+function loop() { refresh().finally(() => setTimeout(loop, $('p2').classList.contains('hide') ? 2000 : 100)); }
+function paintStock() {
+  const g = cur.stock.ab; if (!g) return;
+  $('sStock').textContent = g.stock.toLocaleString(); $('sPrice').textContent = fmt(g.price); $('sSold').textContent = g.sold.toLocaleString(); $('sBuyer').textContent = g.buyer || '–';
+  $('sStock').style.color = g.stock > 0 ? 'var(--ok)' : 'var(--bad)';
+  if (!document.activeElement || document.activeElement.id !== 'priceN') $('priceN').placeholder = '판매 가격 ($) · 현재 ' + g.price.toLocaleString();
+  if ($('p1').classList.contains('hide') === false) refreshCurCol();
+}
+
+// ---- 가격 탭
+function renderRows() {
+  const q = $('q').value.trim().toLowerCase(), kd = $('kind').value, tb = $('rows'); tb.innerHTML = '';
+  for (const [kind, id, name, def] of CATALOG) {
+    if (kd !== 'all' && kd !== kind) continue; if (q && !(name + ' ' + id).toLowerCase().includes(q)) continue;
+    const tr = document.createElement('tr'); tr.dataset.id = id; tr.dataset.def = def;
+    const td1 = document.createElement('td'); td1.textContent = name + ' '; const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = id; td1.appendChild(tg);
+    const td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = fmt(def);
+    const td3 = document.createElement('td'); td3.className = 'num cur';
+    const td4 = document.createElement('td'); td4.className = 'num'; const inp = document.createElement('input'); inp.type = 'number'; inp.min = 0; inp.step = 1; inp.placeholder = '기본가 사용';
+    inp.value = edits[id] !== undefined ? (edits[id] === null ? '' : edits[id]) : (cur.prices[id] !== undefined ? cur.prices[id] : '');
+    inp.oninput = () => onEdit(id, inp.value, tr); td4.appendChild(inp);
+    tr.append(td1, td2, td3, td4); tb.appendChild(tr); onEdit(id, inp.value, tr, true);
+  }
+  refreshCurCol(); countChg();
+}
+function refreshCurCol() { for (const tr of $('rows').children) { const id = tr.dataset.id, o = cur.prices[id], c = tr.querySelector('.cur'); c.innerHTML = ''; c.textContent = fmt(o !== undefined ? o : tr.dataset.def); if (o !== undefined) { const s = document.createElement('span'); s.className = 'tag ov'; s.textContent = '변경됨'; c.append(' ', s); } } }
+function onEdit(id, val, tr, silent) {
+  const o = cur.prices[id]; let v = val === '' ? null : Math.floor(Number(val));
+  if (v !== null && (!Number.isFinite(v) || v < 0 || v > 1e12)) { tr.classList.remove('chg'); delete edits[id]; if (!silent) countChg(); return; }
+  const same = (v === null && o === undefined) || (v !== null && v === o);
+  if (same) delete edits[id]; else edits[id] = v;
+  tr.classList.toggle('chg', !same); if (!silent) countChg();
+}
+function countChg() { const n = Object.keys(edits).length; $('nchg').textContent = n; $('saveAll').disabled = !n; }
+$('q').oninput = renderRows; $('kind').onchange = renderRows;
+$('saveAll').onclick = async () => {
+  const body = {}; for (const [k, v] of Object.entries(edits)) body[k] = v === null ? null : v;
+  $('saveAll').disabled = true;
+  try { const n = await rpc('cc_admin_set_prices', { pw, prices: body }); edits = {}; await refresh(); renderRows(); toast(n + '개 가격이 저장됐어요 · 접속 중인 모두에게 반영돼요', 1); }
+  catch (e) { toast('저장 실패: ' + e.message, 0); countChg(); }
+};
+
+// ---- 재고 탭
+async function stockCall(fn, args, okMsg) {
+  try { await rpc(fn, Object.assign({ pw, p_item: 'ab' }, args)); await refresh(); toast(okMsg, 1); } catch (e) { toast('실패: ' + e.message, 0); }
+}
+const intOf = el => { const n = Math.floor(Number(el.value)); return Number.isFinite(n) ? n : NaN; };
+$('addGo').onclick = () => { const n = intOf($('addN')); if (!(n >= 1)) return toast('추가할 수량을 1 이상으로 입력하세요', 0); stockCall('cc_admin_add_stock', { p_amount: n }, `원자폭탄 ${n}개 입고! 선착순 판매 시작`).then(() => $('addN').value = ''); };
+$('setGo').onclick = () => { const n = intOf($('setN')); if (!(n >= 0)) return toast('0 이상의 수를 입력하세요', 0); stockCall('cc_admin_set_stock', { p_stock: n }, `재고를 ${n}개로 설정했어요`).then(() => $('setN').value = ''); };
+$('zeroGo').onclick = () => { if (confirm('원자폭탄을 품절(0개) 처리할까요?')) stockCall('cc_admin_set_stock', { p_stock: 0 }, '품절 처리했어요'); };
+$('priceGo').onclick = () => { const n = intOf($('priceN')); if (!(n >= 0)) return toast('0 이상의 가격을 입력하세요', 0); const g = cur.stock.ab; stockCall('cc_admin_set_stock', { p_stock: g ? g.stock : 0, p_price: n }, `판매 가격을 ${fmt(n)}로 바꿨어요`).then(() => $('priceN').value = ''); };
+
+// ---- 탭
+function tab(n) { $('p1').classList.toggle('hide', n !== 1); $('p2').classList.toggle('hide', n !== 2); $('t1').classList.toggle('on', n === 1); $('t2').classList.toggle('on', n === 2); }
+$('t1').onclick = () => tab(1); $('t2').onclick = () => tab(2);
+</script>
+</body>
+</html>
