@@ -30,6 +30,14 @@
   #msg{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:#12151d;border:1px solid var(--line);max-width:92vw;display:none;z-index:9}
   #msg.ok{border-color:var(--ok);color:var(--ok)} #msg.bad{border-color:var(--bad);color:var(--bad)}
   .hide{display:none!important} .scroll{max-height:62vh;overflow:auto}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#0b0e14;cursor:pointer;user-select:none}
+  .chip.on{border-color:var(--gold);background:rgba(255,210,63,.1)} .chip input[type=checkbox]{margin:0}
+  .chip select{background:#12151d;border:1px solid var(--line);border-radius:6px;padding:2px 4px}
+  textarea{width:100%;background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--tx);font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+  tr.pick{cursor:pointer} tr.pick:hover td{background:rgba(255,210,63,.07)} tr.sel td{background:rgba(255,210,63,.16)}
+  button.bad{border-color:var(--bad);color:var(--bad)}
   @media (max-width:560px){td input{width:110px}}
 </style>
 </head>
@@ -45,7 +53,7 @@
 <div id="app" class="hide">
   <h1>🛠 CRIME CITY 관리자</h1>
   <div class="sub">변경은 게임에 접속 중인 모든 방·모든 서버의 플레이어에게 즉시(상점·차 가게를 열어 둔 사람은 0.1초, 그 외는 2초 안에) 반영돼요.</div>
-  <div class="tabs"><button id="t1" class="on">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button></div>
+  <div class="tabs"><button id="t1" class="on">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button><button id="t3">👤 계정</button></div>
 
   <div id="p1">
     <div class="card">
@@ -83,6 +91,35 @@
         <button id="priceGo">가격 변경</button>
         <span class="sub" style="margin:0">기본 $100,000,000</span>
       </div>
+    </div>
+  </div>
+
+  <div id="p3" class="hide">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <input id="aq" placeholder="계정 이름 검색" style="flex:1;min-width:140px">
+        <button id="aReload">새로고침</button>
+        <button id="aZero" class="bad">돈 0원 계정 일괄 삭제</button>
+      </div>
+      <div class="scroll" style="max-height:30vh"><table><thead><tr><th>이름</th><th class="num">돈</th><th>마지막 저장</th></tr></thead><tbody id="aRows"></tbody></table></div>
+    </div>
+    <div class="card hide" id="aEd">
+      <div class="row" style="margin-bottom:6px"><b id="aTitle" style="font-size:16px"></b><span class="sub" id="aSeq" style="margin:0"></span></div>
+      <div class="sub">저장하면 열었을 때의 값으로 통째로 덮어써요(접속 중이면 2초 안에 그 사람 화면에 반영). 그 사이 번 돈은 사라질 수 있으니 열자마자 수정하는 걸 추천해요.</div>
+      <div class="grid2">
+        <div><div class="lbl">이름 변경</div><div class="row"><input id="aName" maxlength="24" style="flex:1"><button id="aRen">이름 변경</button></div></div>
+        <div><div class="lbl">돈 ($)</div><div class="row"><input id="aMoney" type="number" min="0" step="1" style="flex:1"><button id="aM0">0</button><button id="aM1">+1억</button></div></div>
+      </div>
+      <div class="lbl" style="margin-top:12px">특수 무기 · 강화 단계(0~10)</div><div id="aWeap" class="chips"></div>
+      <div class="lbl" style="margin-top:12px">보유 차</div><div id="aCars" class="chips"></div>
+      <div class="lbl" style="margin-top:12px">영구 아이템</div><div id="aPerm" class="chips"></div>
+      <div class="grid2" style="margin-top:12px">
+        <div><div class="lbl">☢️ 원자폭탄 개수</div><input id="aAb" type="number" min="0" step="1" style="width:100%"></div>
+        <div><div class="lbl">⛽ 제트팩 연료 업그레이드 Lv(0~5)</div><input id="aJpu" type="number" min="0" max="5" step="1" style="width:100%"></div>
+      </div>
+      <div class="lbl" style="margin-top:12px">전체 데이터(JSON) — 위에 없는 값(웨이포인트 등)도 여기서 직접 고칠 수 있어요</div>
+      <textarea id="aJson" rows="6" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:10px"><button id="aApply">JSON 적용</button><button class="pri" id="aSave">저장</button><button id="aDel" class="bad" style="margin-left:auto">계정 삭제</button></div>
     </div>
   </div>
 </div>
@@ -184,9 +221,98 @@ $('setGo').onclick = () => { const n = intOf($('setN')); if (!(n >= 0)) return t
 $('zeroGo').onclick = () => { if (confirm('원자폭탄을 품절(0개) 처리할까요?')) stockCall('cc_admin_set_stock', { p_stock: 0 }, '품절 처리했어요'); };
 $('priceGo').onclick = () => { const n = intOf($('priceN')); if (!(n >= 0)) return toast('0 이상의 가격을 입력하세요', 0); const g = cur.stock.ab; stockCall('cc_admin_set_stock', { p_stock: g ? g.stock : 0, p_price: n }, `판매 가격을 ${fmt(n)}로 바꿨어요`).then(() => $('priceN').value = ''); };
 
+// ---- 계정 (기존 cc_admin_list / get / set / rename / delete 함수 사용)
+const WEAPONS = [[7, '⚡ 레일건'], [9, '🌋 화염방사기'], [14, '🌩️ 번개총'], [15, '🪚 회전톱'], [16, '🕳️ 블랙홀 건'], [18, '🌀 텔레포트 건'], [19, '💣 끈끈이 폭탄총'], [20, '👑 천벌']];
+const PERMS = [['jp', '🎒 제트팩'], ['gh', '🪝 그래플링 훅'], ['chute', '🪂 낙하산'], ['vest', '🦺 방탄조끼'], ['bag', '💼 현금 가방'], ['pvp', '⚔️ PvP 모드']];
+let accts = [], selName = null, aOwn = {};
+const MAXM = 9e15;
+function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; return o; }
+async function loadAccts() {
+  try { accts = await rpc('cc_admin_list', { pw }) || []; renderAccts(); } catch (e) { toast('계정 목록 실패: ' + e.message, 0); }
+}
+function renderAccts() {
+  const q = $('aq').value.trim().toLowerCase(), tb = $('aRows'); tb.innerHTML = '';
+  for (const a of accts) {
+    if (q && !String(a.name).toLowerCase().includes(q)) continue;
+    const tr = document.createElement('tr'); tr.className = 'pick' + (a.name === selName ? ' sel' : '');
+    const t1 = document.createElement('td'); t1.textContent = a.name;
+    const t2 = document.createElement('td'); t2.className = 'num'; t2.textContent = fmt(a.money);
+    const t3 = document.createElement('td'); t3.textContent = a.updated_at ? new Date(a.updated_at).toLocaleString('ko-KR') : '';
+    tr.append(t1, t2, t3); tr.onclick = () => openAcct(a.name); tb.appendChild(tr);
+  }
+}
+async function openAcct(name) {
+  try {
+    const rows = await rpc('cc_admin_get', { pw, target: name }); const r = rows && rows[0];
+    if (!r) { toast('계정을 찾을 수 없어요', 0); return loadAccts(); }
+    selName = r.name; aOwn = normOwn(r.own);
+    $('aEd').classList.remove('hide'); $('aTitle').textContent = '👤 ' + r.name; $('aSeq').textContent = '  · 관리자 수정 ' + (r.adm_seq || 0) + '회';
+    $('aName').value = r.name; $('aMoney').value = r.money; renderEd(); renderAccts();
+  } catch (e) { toast('불러오기 실패: ' + e.message, 0); }
+}
+function chip(on, labelText, extra) {
+  const l = document.createElement('label'); l.className = 'chip' + (on ? ' on' : '');
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!on; l.appendChild(cb);
+  const s = document.createElement('span'); s.textContent = labelText; l.appendChild(s);
+  if (extra) l.appendChild(extra); return [l, cb];
+}
+function renderEd() {
+  const W = $('aWeap'), C = $('aCars'), P = $('aPerm'); W.innerHTML = ''; C.innerHTML = ''; P.innerHTML = '';
+  for (const [idx, nm] of WEAPONS) {
+    const sel = document.createElement('select'); for (let i = 0; i <= 10; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
+    sel.value = Number(aOwn.wu[idx]) || 0;
+    const [l, cb] = chip(aOwn[idx], nm, sel);
+    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; sel.value = 0; } l.classList.toggle('on', cb.checked); syncJson(); };
+    sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
+    W.appendChild(l);
+  }
+  for (const c of CATALOG.filter(x => x[0] === 'car')) {
+    const [l, cb] = chip(aOwn.cars[c[1]], c[2]);
+    cb.onchange = () => { if (cb.checked) aOwn.cars[c[1]] = 1; else delete aOwn.cars[c[1]]; l.classList.toggle('on', cb.checked); syncJson(); };
+    C.appendChild(l);
+  }
+  for (const [k, nm] of PERMS) {
+    const [l, cb] = chip(aOwn[k], nm);
+    cb.onchange = () => { if (cb.checked) { aOwn[k] = 1; if (k === 'pvp' && aOwn.pvpOn === undefined) aOwn.pvpOn = 1; } else { delete aOwn[k]; if (k === 'pvp') delete aOwn.pvpOn; } l.classList.toggle('on', cb.checked); syncJson(); };
+    P.appendChild(l);
+  }
+  $('aAb').value = Number(aOwn.ab) || 0; $('aJpu').value = Number(aOwn.jpu) || 0; syncJson();
+}
+function syncJson() { $('aJson').value = JSON.stringify(aOwn, null, 1); }
+$('aAb').oninput = () => { const n = Math.max(0, Math.floor(Number($('aAb').value) || 0)); if (n > 0) aOwn.ab = n; else delete aOwn.ab; syncJson(); };
+$('aJpu').oninput = () => { const n = Math.min(5, Math.max(0, Math.floor(Number($('aJpu').value) || 0))); aOwn.jpu = n; syncJson(); };
+$('aApply').onclick = () => { try { const o = JSON.parse($('aJson').value); if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('객체({ })여야 해요'); aOwn = normOwn(o); renderEd(); toast('JSON을 적용했어요 (저장은 따로 눌러야 해요)', 1); } catch (e) { toast('JSON 오류: ' + e.message, 0); } };
+$('aM0').onclick = () => { $('aMoney').value = 0; };
+$('aM1').onclick = () => { $('aMoney').value = Math.min(MAXM, (Math.floor(Number($('aMoney').value)) || 0) + 100000000); };
+$('aSave').onclick = async () => {
+  if (!selName) return; const m = Math.floor(Number($('aMoney').value));
+  if (!Number.isFinite(m) || m < 0 || m > MAXM) return toast('돈은 0 이상 ' + MAXM.toLocaleString() + ' 이하로 입력하세요', 0);
+  try { await rpc('cc_admin_set', { pw, target: selName, new_money: m, new_own: aOwn }); toast(selName + ' 저장 완료 · 접속 중이면 2초 안에 반영돼요', 1); await loadAccts(); await openAcct(selName); }
+  catch (e) { toast('저장 실패: ' + e.message, 0); }
+};
+$('aRen').onclick = async () => {
+  const nn = $('aName').value.trim(); if (!selName || !nn || nn === selName) return toast('새 이름을 입력하세요', 0);
+  try { await rpc('cc_admin_rename', { pw, old_name: selName, new_name: nn }); toast('이름을 바꿨어요: ' + nn, 1); selName = nn; await loadAccts(); await openAcct(nn); }
+  catch (e) { toast('이름 변경 실패: ' + (/exists/i.test(e.message) ? '이미 있는 이름이에요' : e.message), 0); }
+};
+$('aDel').onclick = async () => {
+  if (!selName) return; const t = prompt('정말 삭제할까요? 되돌릴 수 없어요.\n삭제하려면 계정 이름을 그대로 입력하세요:\n' + selName); if (t !== selName) return;
+  try { await rpc('cc_admin_delete', { pw, target: selName }); toast(selName + ' 삭제했어요', 1); selName = null; $('aEd').classList.add('hide'); await loadAccts(); }
+  catch (e) { toast('삭제 실패: ' + e.message, 0); }
+};
+$('aZero').onclick = async () => {
+  const n = accts.filter(a => Number(a.money) === 0).length; if (!n) return toast('돈 0원인 계정이 없어요', 1);
+  if (prompt('돈이 0원인 계정 ' + n + '개를 모두 삭제해요. 되돌릴 수 없어요.\n계속하려면 "삭제"라고 입력하세요') !== '삭제') return;
+  try { const k = await rpc('cc_admin_delete_zero', { pw }); toast(k + '개 삭제했어요', 1); selName = null; $('aEd').classList.add('hide'); await loadAccts(); } catch (e) { toast('실패: ' + e.message, 0); }
+};
+$('aq').oninput = renderAccts; $('aReload').onclick = loadAccts;
+
 // ---- 탭
-function tab(n) { $('p1').classList.toggle('hide', n !== 1); $('p2').classList.toggle('hide', n !== 2); $('t1').classList.toggle('on', n === 1); $('t2').classList.toggle('on', n === 2); }
-$('t1').onclick = () => tab(1); $('t2').onclick = () => tab(2);
+function tab(n) {
+  for (const i of [1, 2, 3]) { $('p' + i).classList.toggle('hide', n !== i); $('t' + i).classList.toggle('on', n === i); }
+  if (n === 3) loadAccts();
+}
+$('t1').onclick = () => tab(1); $('t2').onclick = () => tab(2); $('t3').onclick = () => tab(3);
 </script>
 </body>
 </html>
