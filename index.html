@@ -3505,6 +3505,34 @@
       if (!hit && !coarse && (outerWidth - innerWidth > 240 || outerHeight - innerHeight > 300)) hit = true;
       if (hit) devBlock();
     }, 1500);
+    // v21 관리자 연동: 4초마다 접속 신호(cc_ping) → 관리자 화면의 접속자·방 목록에 표시, 관리자가 보낸 명령·공지·차단을 받아요
+    let pgSeq = null, pgNt = null, banned = false;
+    function banBlock(reason) {
+      if (banned) return; banned = true; profReady = false;
+      try { sb && sb.removeAllChannels && sb.removeAllChannels(); } catch (e) {}
+      if (document.pointerLockElement) document.exitPointerLock();
+      const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#0b0e14;color:#ff6a6a;display:flex;flex-direction:column;align-items:center;justify-content:center;font:800 22px system-ui;text-align:center;padding:24px';
+      o.innerHTML = '🚫 관리자에 의해 접속이 차단되었어요<div style="font:500 15px system-ui;color:#cbd2e0;margin-top:12px;line-height:1.6">' + esc(reason || '') + '</div>'; document.body.appendChild(o);
+    }
+    function adminCmd(c) {
+      if (!c || typeof c !== 'object') return;
+      if (c.t === 'msg') { title('📩 관리자 메시지', String(c.text || '').slice(0, 120), '#ffd23f'); addFeed('📩 관리자: ' + String(c.text || '').slice(0, 120), '#ffd23f'); playSound('cash'); }
+      else if (c.t === 'room') { const k = String(c.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6); if (k.length >= 4) { addFeed('📩 관리자가 방 ' + k + ' (으)로 이동시켰어요', '#ffd23f'); go(k); } }
+      else if (c.t === 'home' || c.t === 'kick') { title(c.t === 'kick' ? '🚪 관리자가 내보냈어요' : '🏠 관리자가 내 방으로 보냈어요', String(c.text || '').slice(0, 120), '#ff8a5a'); go(myCode); }
+      else if (c.t === 'reload') { location.reload(); }
+    }
+    async function pingOnce() {
+      if (!sb || banned || devOpen) return;
+      try {
+        const { data } = await sb.rpc('cc_ping', { p_id: myId, p_name: myName, p_room: room || '', p_money: Math.max(0, Math.round(money)), p_info: raid ? '레이드 W' + raid.wave : hall === 'U' ? '경매장' : hall === 'L' ? '로비' : guest ? '게스트' : '' });
+        if (!data || !data.ok) return;
+        if (data.ban) { banBlock(data.reason); return; }
+        if (pgSeq === null) { pgSeq = data.cmd_seq | 0; pgNt = data.notice_seq | 0; return; }
+        if ((data.notice_seq | 0) > pgNt) { pgNt = data.notice_seq | 0; title('📢 공지', String(data.notice || '').slice(0, 140), '#ffd23f'); addFeed('📢 공지: ' + String(data.notice || ''), '#ffd23f'); playSound('cash'); }
+        if ((data.cmd_seq | 0) > pgSeq) { pgSeq = data.cmd_seq | 0; adminCmd(data.cmd); }
+      } catch (e) {}
+    }
+    setInterval(pingOnce, 4000); setTimeout(pingOnce, 1500);
     window.addEventListener('keydown', e => {
       const k = (e.key || '').toLowerCase();
       if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && 'ijc'.includes(k)) || ((e.ctrlKey || e.metaKey) && k === 'u') || (e.metaKey && e.altKey && 'iju'.includes(k))) { e.preventDefault(); e.stopPropagation(); }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>CRIME CITY 관리자 · 가격/재고</title>
+<title>CRIME CITY 관리자</title>
 <style>
   :root{--bg:#0b0e14;--card:#12151d;--line:#232a39;--tx:#e8ecf5;--mut:#8b95a8;--gold:#ffd23f;--ok:#4cd98a;--bad:#ff6a6a}
   *{box-sizing:border-box}
@@ -45,7 +45,7 @@
 
 <div id="login" class="card" style="max-width:420px;margin:12vh auto 0">
   <h1>🛠 CRIME CITY 관리자</h1>
-  <div class="sub">가격 변경 · 원자폭탄 글로벌 재고</div>
+  <div class="sub">접속자·방 · 경매 · 계정 · 가격 · 원자폭탄 재고</div>
   <div class="row"><input id="pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" style="flex:1"><button class="pri" id="go">로그인</button></div>
   <div class="sub" style="margin-top:10px">비밀번호는 이 탭 메모리에만 있고 저장되지 않아요. 틀리면 1.5초 지연돼요.</div>
 </div>
@@ -53,9 +53,38 @@
 <div id="app" class="hide">
   <h1>🛠 CRIME CITY 관리자</h1>
   <div class="sub">변경은 게임에 접속 중인 모든 방·모든 서버의 플레이어에게 즉시(상점·차 가게를 열어 둔 사람은 0.1초, 그 외는 2초 안에) 반영돼요.</div>
-  <div class="tabs"><button id="t1" class="on">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button><button id="t3">👤 계정</button></div>
+  <div class="tabs" style="flex-wrap:wrap"><button id="t4" class="on">🟢 접속자·방</button><button id="t5">🔨 경매</button><button id="t3">👤 계정</button><button id="t1">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button></div>
 
-  <div id="p1">
+  <div id="p4">
+    <div class="stat"><div><div class="lbl">접속 중</div><div class="big" id="oN">–</div></div><div><div class="lbl">열린 방</div><div class="big" id="oR">–</div></div></div>
+    <div class="card">
+      <div class="row"><input id="ntxt" maxlength="200" placeholder="전체 공지 내용 (접속 중인 모두에게 표시)" style="flex:1;min-width:200px"><button class="pri" id="ntGo">📢 전체 공지</button></div>
+      <div class="sub" style="margin:8px 0 0">표시는 4초 안에 반영돼요. 아래 목록은 2초마다 갱신돼요 (최근 25초 안에 신호를 보낸 사람만 접속 중으로 봐요).</div>
+    </div>
+    <div class="card"><div class="scroll"><table><thead><tr><th>방 / 플레이어</th><th class="num">돈</th><th>상태</th><th>제어</th></tr></thead><tbody id="oRows"></tbody></table></div></div>
+    <div class="card"><div class="lbl">🚫 차단된 이름</div><div id="banList" class="chips"></div>
+      <div class="row" style="margin-top:8px"><input id="banName" placeholder="차단할 이름" style="width:160px"><input id="banWhy" placeholder="사유(선택)" style="flex:1"><button class="bad" id="banGo">차단</button></div></div>
+  </div>
+
+  <div id="p5" class="hide">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px"><select id="auSt" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option value="open">판매 중</option><option value="sold">판매 완료</option><option value="cancelled">취소됨</option><option value="all">전체</option></select><button id="auReload">새로고침</button><span class="sub" style="margin:0" id="auInfo"></span></div>
+      <div class="scroll" style="max-height:44vh"><table><thead><tr><th>#</th><th>판매자</th><th>물품</th><th class="num">가격 ($)</th><th>상태</th><th>제어</th></tr></thead><tbody id="auRows"></tbody></table></div>
+    </div>
+    <div class="card"><div class="lbl">➕ 관리자가 직접 경매에 올리기 (판매자 [관리자] · 팔려도 대금은 지급되지 않아요)</div>
+      <div class="row" style="margin-top:8px">
+        <select id="nkKind" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option value="weapon">⚔️ 무기</option><option value="gren">💣 수류탄</option><option value="tnt">🧨 TNT</option><option value="ab">☢️ 원자폭탄</option></select>
+        <select id="nkW" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select>
+        <input id="nkLv" type="number" min="1" max="99" value="10" style="width:80px" title="강화 단계">
+        <select id="nkEn" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select>
+        <select id="nkEl" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option>1</option><option>2</option><option>3</option></select>
+        <input id="nkQ" type="number" min="1" value="10" style="width:90px" title="수량">
+        <input id="nkP" type="number" min="0" placeholder="가격 ($)" style="width:140px">
+        <button class="pri" id="nkGo">경매에 올리기</button>
+      </div></div>
+  </div>
+
+  <div id="p1" class="hide">
     <div class="card">
       <div class="row" style="margin-bottom:10px">
         <input id="q" placeholder="이름·ID 검색" style="flex:1;min-width:140px">
@@ -105,12 +134,13 @@
     </div>
     <div class="card hide" id="aEd">
       <div class="row" style="margin-bottom:6px"><b id="aTitle" style="font-size:16px"></b><span class="sub" id="aSeq" style="margin:0"></span></div>
+      <div class="row" id="aCtl" style="margin:6px 0 10px"><span class="lbl" id="aOn" style="min-width:90px"></span><button id="cMsg">📩 메시지</button><button id="cHome">🏠 내 방으로</button><button id="cKick">🚪 내보내기</button><button id="cRoom">➡️ 방 이동</button><button id="cBan" class="bad">🚫 차단</button><button id="cUnban">차단 해제</button></div>
       <div class="sub">저장하면 열었을 때의 값으로 통째로 덮어써요(접속 중이면 2초 안에 그 사람 화면에 반영). 그 사이 번 돈은 사라질 수 있으니 열자마자 수정하는 걸 추천해요.</div>
       <div class="grid2">
         <div><div class="lbl">이름 변경</div><div class="row"><input id="aName" maxlength="24" style="flex:1"><button id="aRen">이름 변경</button></div></div>
         <div><div class="lbl">돈 ($)</div><div class="row"><input id="aMoney" type="number" min="0" step="1" style="flex:1"><button id="aM0">0</button><button id="aM1">+1억</button></div></div>
       </div>
-      <div class="lbl" style="margin-top:12px">특수 무기 · 강화 단계(0~10)</div><div id="aWeap" class="chips"></div>
+      <div class="lbl" style="margin-top:12px">특수 무기 · 강화 단계(0~99) · 인첸트(종류/레벨)</div><div id="aWeap" class="chips"></div>
       <div class="lbl" style="margin-top:12px">보유 차</div><div id="aCars" class="chips"></div>
       <div class="lbl" style="margin-top:12px">영구 아이템</div><div id="aPerm" class="chips"></div>
       <div class="grid2" style="margin-top:12px">
@@ -157,7 +187,7 @@ async function rpc(fn, body) {
 async function login() {
   const v = $('pw').value; if (!v) return; $('go').disabled = true;
   /* cc_admin_check 는 직접 호출이 막혀 있어서, 비번을 검사하는 cc_admin_list 로 로그인 확인 */
-  try { await rpc('cc_admin_list', { pw: v }); pw = v; $('login').classList.add('hide'); $('app').classList.remove('hide'); await refresh(); renderRows(); loop(); }
+  try { await rpc('cc_admin_list', { pw: v }); pw = v; $('login').classList.add('hide'); $('app').classList.remove('hide'); await refresh(); renderRows(); loop(); tab(4); }
   catch (e) { toast(/wrong password/i.test(e.message) ? '비밀번호가 틀렸어요' : '로그인 실패: ' + e.message, 0); }
   $('go').disabled = false;
 }
@@ -222,9 +252,11 @@ $('zeroGo').onclick = () => { if (confirm('원자폭탄을 품절(0개) 처리�
 $('priceGo').onclick = () => { const n = intOf($('priceN')); if (!(n >= 0)) return toast('0 이상의 가격을 입력하세요', 0); const g = cur.stock.ab; stockCall('cc_admin_set_stock', { p_stock: g ? g.stock : 0, p_price: n }, `판매 가격을 ${fmt(n)}로 바꿨어요`).then(() => $('priceN').value = ''); };
 
 // ---- 계정 (기존 cc_admin_list / get / set / rename / delete 함수 사용)
-const WEAPONS = [[7, '⚡ 레일건'], [9, '🌋 화염방사기'], [14, '🌩️ 번개총'], [15, '🪚 회전톱'], [16, '🕳️ 블랙홀 건'], [18, '🌀 텔레포트 건'], [19, '💣 끈끈이 폭탄총'], [20, '👑 천벌']];
+const WEAPONS = [[6, '미니건'], [7, '⚡ 레일건'], [8, '멀티 로켓런처'], [9, '🌋 화염방사기'], [10, '플라즈마 라이플'], [11, '유탄발사기'], [12, '석궁'], [13, '레이저 소총'], [14, '🌩️ 번개총'], [15, '🪚 회전톱'], [16, '🕳️ 블랙홀 건'], [17, '네이팜탄'], [18, '🌀 텔레포트 건'], [19, '💣 끈끈이 폭탄총'], [20, '👑 천벌']];
+const ENCHN = ['🔥 화염', '⚡ 뇌전', '💥 폭렬', '🏹 관통', '💰 약탈', '👻 은밀', '❄️ 빙결', '🎯 급소', '🔋 절약', '⏩ 속사', '🌟 분열', '🕳️ 인력', '💨 질주', '☠️ 처형', '🔄 속장전'];
+const KINDN = { gren: '💣 수류탄', tnt: '🧨 TNT', ab: '☢️ 원자폭탄' };
 const PERMS = [['jp', '🎒 제트팩'], ['gh', '🪝 그래플링 훅'], ['chute', '🪂 낙하산'], ['vest', '🦺 방탄조끼'], ['bag', '💼 현금 가방'], ['pvp', '⚔️ PvP 모드']];
-let accts = [], selName = null, aOwn = {};
+let accts = [], selName = null, aOwn = {}, online = [], onlineNames = new Set();
 const MAXM = 9e15;
 function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; o.en = (o.en && typeof o.en === 'object' && !Array.isArray(o.en)) ? o.en : {}; return o; }
 async function loadAccts() {
@@ -235,7 +267,7 @@ function renderAccts() {
   for (const a of accts) {
     if (q && !String(a.name).toLowerCase().includes(q)) continue;
     const tr = document.createElement('tr'); tr.className = 'pick' + (a.name === selName ? ' sel' : '');
-    const t1 = document.createElement('td'); t1.textContent = a.name;
+    const t1 = document.createElement('td'); t1.textContent = (onlineNames.has(a.name) ? '🟢 ' : '') + a.name;
     const t2 = document.createElement('td'); t2.className = 'num'; t2.textContent = fmt(a.money);
     const t3 = document.createElement('td'); t3.textContent = a.updated_at ? new Date(a.updated_at).toLocaleString('ko-KR') : '';
     tr.append(t1, t2, t3); tr.onclick = () => openAcct(a.name); tb.appendChild(tr);
@@ -246,7 +278,7 @@ async function openAcct(name) {
     const rows = await rpc('cc_admin_get', { pw, target: name }); const r = rows && rows[0];
     if (!r) { toast('계정을 찾을 수 없어요', 0); return loadAccts(); }
     selName = r.name; aOwn = normOwn(r.own);
-    $('aEd').classList.remove('hide'); $('aTitle').textContent = '👤 ' + r.name; $('aSeq').textContent = '  · 관리자 수정 ' + (r.adm_seq || 0) + '회';
+    paintOn(); $('aEd').classList.remove('hide'); $('aTitle').textContent = '👤 ' + r.name; $('aSeq').textContent = '  · 관리자 수정 ' + (r.adm_seq || 0) + '회';
     $('aName').value = r.name; $('aMoney').value = r.money; renderEd(); renderAccts();
   } catch (e) { toast('불러오기 실패: ' + e.message, 0); }
 }
@@ -261,8 +293,14 @@ function renderEd() {
   for (const [idx, nm] of WEAPONS) {
     const sel = document.createElement('select'); for (let i = 0; i <= 99; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
     sel.value = Number(aOwn.wu[idx]) || 0;
-    const [l, cb] = chip(aOwn[idx], nm, sel);
-    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; } l.classList.toggle('on', cb.checked); syncJson(); };
+    const es = document.createElement('select'); es.title = '인첸트 종류'; es.innerHTML = '<option value="-1">인첸트 없음</option>' + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+    const el = document.createElement('select'); el.title = '인첸트 레벨'; el.innerHTML = '<option>1</option><option>2</option><option>3</option>';
+    const cur = Array.isArray(aOwn.en[idx]) ? aOwn.en[idx] : null; es.value = cur ? cur[0] : -1; el.value = cur ? cur[1] : 1;
+    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;gap:4px'; ex.append(sel, es, el);
+    const [l, cb] = chip(aOwn[idx], nm, ex);
+    const setEn = () => { const t = Number(es.value); if (t >= 0) { aOwn[idx] = 1; aOwn.en[idx] = [t, Number(el.value) || 1]; cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
+    es.onchange = setEn; el.onchange = setEn;
+    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; es.value = -1; } l.classList.toggle('on', cb.checked); syncJson(); };
     sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
     W.appendChild(l);
   }
@@ -308,11 +346,107 @@ $('aZero').onclick = async () => {
 $('aq').oninput = renderAccts; $('aReload').onclick = loadAccts;
 
 // ---- 탭
+let curTab = 4;
 function tab(n) {
-  for (const i of [1, 2, 3]) { $('p' + i).classList.toggle('hide', n !== i); $('t' + i).classList.toggle('on', n === i); }
-  if (n === 3) loadAccts();
+  curTab = n;
+  for (const i of [1, 2, 3, 4, 5]) { $('p' + i).classList.toggle('hide', n !== i); $('t' + i).classList.toggle('on', n === i); }
+  if (n === 3) loadAccts(); if (n === 4) { loadOnline(); loadBans(); } if (n === 5) loadAuc();
 }
-$('t1').onclick = () => tab(1); $('t2').onclick = () => tab(2); $('t3').onclick = () => tab(3);
+for (const i of [1, 2, 3, 4, 5]) $('t' + i).onclick = () => tab(i);
+
+// ---- 접속자 · 방 (2초마다 갱신)
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function loadOnline() {
+  try { online = await rpc('cc_admin_online', { pw }) || []; onlineNames = new Set(online.map(o => o.name)); renderOnline(); paintOn(); if (curTab === 3) renderAccts(); } catch (e) { }
+}
+function mkBtn(t, fn, cls) { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.style.padding = '4px 9px'; b.onclick = fn; return b; }
+async function sendCmd(id, cmd, okMsg) { try { const n = await rpc('cc_admin_cmd', { pw, p_id: id, p_cmd: cmd }); toast(n ? okMsg + ' · 4초 안에 반영돼요' : '이미 접속이 끊겼어요', !!n); } catch (e) { toast('실패: ' + e.message, 0); } }
+async function sendRoom(room, cmd, okMsg) { try { const n = await rpc('cc_admin_cmd_room', { pw, p_room: room, p_cmd: cmd }); toast(n + '명에게 ' + okMsg + ' · 4초 안에 반영돼요', 1); } catch (e) { toast('실패: ' + e.message, 0); } }
+function renderOnline() {
+  $('oN').textContent = online.length; const rooms = [...new Set(online.map(o => o.room))]; $('oR').textContent = rooms.length;
+  const tb = $('oRows'); tb.innerHTML = '';
+  for (const room of rooms) {
+    const ps = online.filter(o => o.room === room), hr = document.createElement('tr'); hr.className = 'sel';
+    const label = room === 'WWWWW' ? ' ⚔️ PvP 아레나' : room === 'UUUUU' ? ' 🔨 경매장' : room === 'LLLLL' ? ' 🚔 레이드 로비' : /^RI/.test(room) && room.length === 6 ? ' 🚔 레이드 방' : '';
+    const h1 = document.createElement('td'); h1.colSpan = 3; h1.innerHTML = '<b>방 ' + esc(room) + '</b>' + label + ' · ' + ps.length + '명';
+    const h4 = document.createElement('td'); h4.append(mkBtn('방 전체 메시지', () => { const t = prompt('방 ' + room + ' 전원에게 보낼 메시지:'); if (t) sendRoom(room, { t: 'msg', text: t }, '메시지 전송'); }), ' ', mkBtn('전원 내 방으로', () => { if (confirm('방 ' + room + ' 의 ' + ps.length + '명을 각자 자기 방으로 보낼까요?')) sendRoom(room, { t: 'home' }, '이동'); }));
+    hr.append(h1, h4); tb.appendChild(hr);
+    for (const o of ps) {
+      const tr = document.createElement('tr'), t1 = document.createElement('td'), t2 = document.createElement('td'), t3 = document.createElement('td'), t4 = document.createElement('td');
+      t1.textContent = '  ' + (o.name || '(이름 없음)'); t2.className = 'num'; t2.textContent = fmt(o.money); t3.textContent = o.info || '';
+      t4.append(
+        mkBtn('📩', () => { const t = prompt(o.name + ' 님에게 보낼 메시지:'); if (t) sendCmd(o.id, { t: 'msg', text: t }, '메시지 전송'); }), ' ',
+        mkBtn('➡️ 방 이동', () => { const c = prompt(o.name + ' 님을 이동시킬 방 코드 (예: UUUUU, LLLLL, WWWWW):'); if (c) sendCmd(o.id, { t: 'room', code: c }, '이동 명령'); }), ' ',
+        mkBtn('🏠', () => sendCmd(o.id, { t: 'home' }, '내 방으로 보냄')), ' ',
+        mkBtn('🚪 내보내기', () => { if (confirm(o.name + ' 님을 내보낼까요? (내 방으로 보내요)')) sendCmd(o.id, { t: 'kick', text: '관리자가 내보냈어요' }, '내보내기'); }), ' ',
+        mkBtn('👤 계정', () => { tab(3); openAcct(o.name); }), ' ',
+        mkBtn('🚫 차단', () => banName(o.name), 'bad'));
+      tr.append(t1, t2, t3, t4); tb.appendChild(tr);
+    }
+  }
+  if (!rooms.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--mut);padding:20px;text-align:center">지금 접속 중인 사람이 없어요</td></tr>';
+}
+async function banName(n) {
+  if (!n) return; const why = prompt('"' + n + '" 이름을 차단할까요? 사유 (비워도 돼요):', ''); if (why === null) return;
+  try { await rpc('cc_admin_ban', { pw, p_name: n, p_reason: why, p_on: true }); toast(n + ' 차단 · 4초 안에 접속이 막혀요', 1); loadBans(); } catch (e) { toast('실패: ' + e.message, 0); }
+}
+async function loadBans() {
+  try { const bs = await rpc('cc_admin_bans', { pw }) || []; const box = $('banList'); box.innerHTML = '';
+    if (!bs.length) box.innerHTML = '<span class="sub" style="margin:0">차단된 이름이 없어요</span>';
+    for (const b of bs) { const c = document.createElement('span'); c.className = 'chip on'; c.textContent = b.name + (b.reason ? ' (' + b.reason + ')' : '') + '  ✕ 해제'; c.onclick = async () => { try { await rpc('cc_admin_ban', { pw, p_name: b.name, p_reason: '', p_on: false }); toast('차단 해제: ' + b.name, 1); loadBans(); } catch (e) { toast('실패: ' + e.message, 0); } }; box.appendChild(c); }
+  } catch (e) { }
+}
+$('banGo').onclick = () => { const n = $('banName').value.trim(); if (!n) return toast('차단할 이름을 입력하세요', 0); rpc('cc_admin_ban', { pw, p_name: n, p_reason: $('banWhy').value.trim(), p_on: true }).then(() => { toast(n + ' 차단', 1); $('banName').value = ''; $('banWhy').value = ''; loadBans(); }).catch(e => toast('실패: ' + e.message, 0)); };
+$('ntGo').onclick = async () => { const t = $('ntxt').value.trim(); if (!t) return toast('공지 내용을 입력하세요', 0); try { await rpc('cc_admin_notice', { pw, p_text: t }); toast('전체 공지를 보냈어요 · 4초 안에 모두에게 표시돼요', 1); $('ntxt').value = ''; } catch (e) { toast('실패: ' + e.message, 0); } };
+setInterval(() => { if (pw && curTab === 4 && !document.hidden) loadOnline(); else if (pw && curTab === 3 && !document.hidden) loadOnline(); }, 2000);
+
+// ---- 선택한 계정 제어 (접속 중이면 해당 접속에 명령)
+function paintOn() { const el = $('aOn'); if (!el) return; const n = online.filter(o => o.name === selName).length; el.textContent = selName ? (n ? '🟢 접속 중 (' + online.find(o => o.name === selName).room + ')' : '⚪ 오프라인') : ''; }
+function selOnline() { return online.filter(o => o.name === selName); }
+$('cMsg').onclick = () => { const l = selOnline(); if (!l.length) return toast('접속 중이 아니에요', 0); const t = prompt(selName + ' 님에게 보낼 메시지:'); if (t) l.forEach(o => sendCmd(o.id, { t: 'msg', text: t }, '메시지 전송')); };
+$('cHome').onclick = () => { const l = selOnline(); if (!l.length) return toast('접속 중이 아니에요', 0); l.forEach(o => sendCmd(o.id, { t: 'home' }, '내 방으로 보냄')); };
+$('cKick').onclick = () => { const l = selOnline(); if (!l.length) return toast('접속 중이 아니에요', 0); if (confirm(selName + ' 님을 내보낼까요?')) l.forEach(o => sendCmd(o.id, { t: 'kick', text: '관리자가 내보냈어요' }, '내보내기')); };
+$('cRoom').onclick = () => { const l = selOnline(); if (!l.length) return toast('접속 중이 아니에요', 0); const c = prompt('이동시킬 방 코드:'); if (c) l.forEach(o => sendCmd(o.id, { t: 'room', code: c }, '이동 명령')); };
+$('cBan').onclick = () => banName(selName);
+$('cUnban').onclick = () => { if (!selName) return; rpc('cc_admin_ban', { pw, p_name: selName, p_reason: '', p_on: false }).then(() => toast('차단 해제: ' + selName, 1)).catch(e => toast('실패: ' + e.message, 0)); };
+
+// ---- 경매 관리
+let aucs = [];
+const wNmA = i => (WEAPONS.find(w => w[0] === i) || [0, '무기 ' + i])[1];
+function aucDesc(a) { if (a.kind === 'weapon') { const e = Array.isArray(a.ench) ? ENCHN[a.ench[0]] : null; return '⚔️ ' + wNmA(a.weapon) + ' +' + a.lv + (e ? ' · ' + e + ' Lv' + a.ench[1] : ''); } return (KINDN[a.kind] || a.kind) + ' ×' + Number(a.qty).toLocaleString(); }
+async function loadAuc() {
+  try { aucs = await rpc('cc_admin_auctions', { pw, p_status: $('auSt').value }) || []; renderAuc(); } catch (e) { toast('경매 목록 실패: ' + e.message, 0); }
+}
+function renderAuc() {
+  const tb = $('auRows'); tb.innerHTML = ''; $('auInfo').textContent = aucs.length + '건 · 3초마다 갱신';
+  const stN = { open: '판매 중', sold: '판매 완료', cancelled: '취소' };
+  for (const a of aucs) {
+    const tr = document.createElement('tr'), c = []; for (let i = 0; i < 6; i++) c.push(document.createElement('td'));
+    c[0].textContent = a.id; c[1].textContent = a.seller; c[2].textContent = aucDesc(a);
+    c[3].className = 'num';
+    if (a.status === 'open') { const inp = document.createElement('input'); inp.type = 'number'; inp.min = 0; inp.value = a.price; inp.style.width = '130px'; c[3].append(inp, ' ', mkBtn('변경', async () => { const v = Math.floor(Number(inp.value)); if (!(v >= 0)) return toast('가격을 확인하세요', 0); try { await rpc('cc_admin_auction_price', { pw, p_id: a.id, p_price: v }); toast('가격을 바꿨어요', 1); loadAuc(); } catch (e) { toast('실패: ' + e.message, 0); } })); }
+    else c[3].textContent = fmt(a.price);
+    c[4].textContent = (stN[a.status] || a.status) + (a.buyer ? ' · 구매 ' + a.buyer : '');
+    if (a.status === 'open') c[5].append(
+      mkBtn('돌려주고 내리기', () => aucRemove(a, 'return')), ' ', mkBtn('삭제', () => { if (confirm('#' + a.id + ' 를 삭제할까요? 물건은 돌려주지 않고 사라져요.')) aucRemove(a, 'delete'); }, 'bad'));
+    tr.append(...c); tb.appendChild(tr);
+  }
+  if (!aucs.length) tb.innerHTML = '<tr><td colspan="6" style="color:var(--mut);padding:20px;text-align:center">경매 물품이 없어요</td></tr>';
+}
+async function aucRemove(a, mode) {
+  try { const r = await rpc('cc_admin_auction_remove', { pw, p_id: a.id, p_mode: mode }); if (r && r.ok) toast(mode === 'return' ? '내렸어요 · 물건은 판매자에게 돌아갔어요' : '삭제했어요', 1); else toast('실패: ' + ({ already_owned: '판매자가 같은 무기를 이미 갖고 있어요 (삭제를 쓰거나 먼저 정리)', no_profile: '판매자 계정이 없어요 (삭제를 쓰세요)', not_open: '이미 끝난 경매예요', not_found: '없는 경매예요' }[r && r.err] || (r && r.err)), 0); loadAuc(); }
+  catch (e) { toast('실패: ' + e.message, 0); }
+}
+$('auSt').onchange = loadAuc; $('auReload').onclick = loadAuc;
+setInterval(() => { if (pw && curTab === 5 && !document.hidden && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#auRows'))) loadAuc(); }, 3000);
+$('nkW').innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('');
+$('nkEn').innerHTML = '<option value="-1">인첸트 없음</option>' + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+$('nkGo').onclick = async () => {
+  const kind = $('nkKind').value, price = Math.floor(Number($('nkP').value)); if (!(price >= 0)) return toast('가격을 입력하세요', 0);
+  const et = Number($('nkEn').value), ench = kind === 'weapon' && et >= 0 ? [et, Number($('nkEl').value)] : null;
+  try { const id = await rpc('cc_admin_auction_add', { pw, p_kind: kind, p_weapon: kind === 'weapon' ? Number($('nkW').value) : null, p_lv: kind === 'weapon' ? Math.max(1, Math.min(99, Math.floor(Number($('nkLv').value)) || 1)) : 0, p_ench: ench, p_qty: kind === 'weapon' ? 1 : Math.max(1, Math.floor(Number($('nkQ').value)) || 1), p_price: price }); toast('경매에 올렸어요 (#' + id + ')', 1); loadAuc(); }
+  catch (e) { toast('실패: ' + e.message, 0); }
+};
 </script>
 </body>
 </html>
