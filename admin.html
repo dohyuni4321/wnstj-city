@@ -140,7 +140,7 @@ const CATALOG = [
   ['shop','gren','💣 수류탄 ×5',1500],['shop','tnt','🧨 TNT ×3',2500],['shop','ammo','📦 탄약 전부 충전',500],['shop','fix','🔧 차량 수리',1500],
   ['shop','bt','⏱️ 불릿타임 충전',800],['shop','clr','🕶️ 수배 지우기',5000],['shop','arc','🌩️ 번개총',120000],['shop','saw','🪚 회전톱',95000],
   ['shop','hole','🕳️ 블랙홀 건',350000],['shop','stk','💣 끈끈이 폭탄총',110000],['shop','tele','🌀 텔레포트 건',180000],['shop','pvp','⚔️ PvP 모드',500000],
-  ['shop','chute','🪂 낙하산',60000],['shop','vest','🦺 방탄조끼',90000],['shop','bag','💼 현금 가방',120000],['shop','can','🛢️ 휴대용 연료통',2500],['shop','nitro','🏎️ 니트로',12000]
+  ['shop','chute','🪂 낙하산',60000],['shop','vest','🦺 방탄조끼',90000],['shop','ench','🔮 인첸트 이용권',50000],['shop','bag','💼 현금 가방',120000],['shop','can','🛢️ 휴대용 연료통',2500],['shop','nitro','🏎️ 니트로',12000]
 ];
 const $ = id => document.getElementById(id), fmt = n => '$' + Number(n).toLocaleString();
 let pw = '', cur = { prices: {}, stock: {} }, edits = {};
@@ -226,7 +226,7 @@ const WEAPONS = [[7, '⚡ 레일건'], [9, '🌋 화염방사기'], [14, '🌩�
 const PERMS = [['jp', '🎒 제트팩'], ['gh', '🪝 그래플링 훅'], ['chute', '🪂 낙하산'], ['vest', '🦺 방탄조끼'], ['bag', '💼 현금 가방'], ['pvp', '⚔️ PvP 모드']];
 let accts = [], selName = null, aOwn = {};
 const MAXM = 9e15;
-function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; return o; }
+function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; o.en = (o.en && typeof o.en === 'object' && !Array.isArray(o.en)) ? o.en : {}; return o; }
 async function loadAccts() {
   try { accts = await rpc('cc_admin_list', { pw }) || []; renderAccts(); } catch (e) { toast('계정 목록 실패: ' + e.message, 0); }
 }
@@ -259,10 +259,10 @@ function chip(on, labelText, extra) {
 function renderEd() {
   const W = $('aWeap'), C = $('aCars'), P = $('aPerm'); W.innerHTML = ''; C.innerHTML = ''; P.innerHTML = '';
   for (const [idx, nm] of WEAPONS) {
-    const sel = document.createElement('select'); for (let i = 0; i <= 10; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
+    const sel = document.createElement('select'); for (let i = 0; i <= 99; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
     sel.value = Number(aOwn.wu[idx]) || 0;
     const [l, cb] = chip(aOwn[idx], nm, sel);
-    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; sel.value = 0; } l.classList.toggle('on', cb.checked); syncJson(); };
+    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; } l.classList.toggle('on', cb.checked); syncJson(); };
     sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
     W.appendChild(l);
   }

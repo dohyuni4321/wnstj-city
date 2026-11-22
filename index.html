@@ -374,7 +374,10 @@
     }
   }
 
-  const inW = (x, y) => x > -600 && y > -600 && x < W + 600 && y < W + 600;
+  // v21: 로비(L)·경매장(U)은 도시 밖 서쪽 바다 위에 따로 떠 있는 홀 (방 코드 LLLLL / UUUUU로 입장). 홀 안쪽만 걸을 수 있고 가장자리는 벽
+  const HALLS = { L: { x: -2400, y: 2000, h: 380 }, U: { x: -2400, y: 3600, h: 380 } };
+  const inHall = (x, y) => { for (const k in HALLS) { const q = HALLS[k]; if (Math.abs(x - q.x) < q.h && Math.abs(y - q.y) < q.h) return true; } return false; };
+  const inW = (x, y) => (x > -600 && y > -600 && x < W + 600 && y < W + 600) || inHall(x, y);
   // 놀이터 충돌 박스 (블록 중심 기준 로컬 좌표: [cx, cz, 반폭x, 반폭z])
   const PG_COL = [
     [138, 0, 3, 141], [-138, 0, 3, 141], [0, -138, 141, 3], [-81, 138, 61, 3], [81, 138, 61, 3], // 울타리
@@ -436,10 +439,44 @@
     { n: '천벌', mag: 3, cd: 1.5, dmg: 0, pel: 1, sp: 0, rel: 4, v: 2400, life: 1.6, h: 0.5, k: 6, col: 0xffd23f, sz: 3, len: 4, orb: 1, leg: 1, tip: '👑 레전드 · 맞춘 곳에 궤도 포격! 1.4초 뒤 십자 5연속 대폭발' }
   ], am = WP.map(w => w.mag);
 
+  // ---------------------------------------------------------------- v21: 강화 99단계 곡선 · 인첸트 15종
+  const ENH_MAX = 99;
+  const dmgMul = lv => lv <= 10 ? 1 + 0.15 * lv : 2.5 + 0.05 * (lv - 10);                      // +10까지는 기존과 동일, 이후 완만하게 (99강 ×6.95)
+  const cdMul = lv => lv <= 10 ? 1 - 0.025 * lv : Math.max(0.45, 0.75 - 0.0035 * (lv - 10));   // 발사 간격 (최소 ×0.45 — 0 이하로 내려가 무한 연사 되는 것 방지)
+  const rngMul = lv => 1 + 0.06 * Math.min(lv, 10) + 0.01 * Math.max(0, lv - 10);               // 화염방사기 사거리
+  const ENH_P = [90, 80, 70, 60, 50, 40, 32, 25, 18, 12];
+  const enhChance = lv => lv < 10 ? ENH_P[lv] : Math.max(2, Math.round(12 * Math.pow(0.94, lv - 9) * 10) / 10);
+  const enhCost = lv => lv < 10 ? Math.round(1500 * Math.pow(1.55, lv) / 100) * 100 : Math.round(77300 * Math.pow(1.07, lv - 9) / 100) * 100;
+  const ENH_DROP = lv => lv >= 6 && lv <= 9;   // 실패 시 −1단계는 +6~+9에서만 (10강부터는 실패해도 유지 → 99강까지 도달 가능)
+  const pct = v => Math.round(v * 100);
+  // t: hit = 적중 시 발동(총알 무기) · fire = 발사 때 탄 성질 변경 · any = 항상 적용
+  const ENCH = [
+    { id: 'fire', ic: '🔥', n: '화염', t: 'hit', v: [0.25, 0.4, 0.6], d: v => `적중 시 ${pct(v)}% 확률로 불길 발생 (경찰·차에 지속 피해)` },
+    { id: 'storm', ic: '⚡', n: '뇌전', t: 'fire', v: [0.3, 0.55, 1], d: v => `${pct(v)}% 확률로 연쇄 번개 탄 (주변 3명에게 번개)` },
+    { id: 'blast', ic: '💥', n: '폭렬', t: 'hit', v: [0.2, 0.3, 0.45], d: v => `적중 시 ${pct(v)}% 확률로 소폭발` },
+    { id: 'pierce', ic: '🏹', n: '관통', t: 'fire', v: [1, 2, 3], d: v => `탄이 ${v}명 관통${v >= 3 ? ' + 건물도 통과' : ''}` },
+    { id: 'loot', ic: '💰', n: '약탈', t: 'hit', v: [60, 150, 400], d: v => `적중할 때마다 +$${v}` },
+    { id: 'ghost', ic: '👻', n: '은밀', t: 'fire', v: [0.6, 0.35, 0.1], d: v => `이 무기로 오르는 수배 ${pct(1 - v)}% 감소` },
+    { id: 'frost', ic: '❄️', n: '빙결', t: 'hit', v: [1.2, 2.2, 3.5], d: v => `맞은 경찰·경찰차 ${v}초 기절` },
+    { id: 'crit', ic: '🎯', n: '급소', t: 'fire', v: [0.15, 0.25, 0.4], d: v => `${pct(v)}% 확률로 데미지 ×2.5` },
+    { id: 'saver', ic: '🔋', n: '절약', t: 'any', v: [0.15, 0.3, 0.5], d: v => `발사 시 ${pct(v)}% 확률로 탄약 소모 없음` },
+    { id: 'haste', ic: '⏩', n: '속사', t: 'any', v: [0.9, 0.8, 0.65], d: v => `발사 간격 ${pct(1 - v)}% 단축` },
+    { id: 'split', ic: '🌟', n: '분열', t: 'fire', v: [1, 2, 3], d: v => `발사할 때 추가 탄 ${v}발 (각 60% 데미지)` },
+    { id: 'well', ic: '🕳️', n: '인력', t: 'hit', v: [0.08, 0.14, 0.22], d: v => `적중 시 ${pct(v)}% 확률로 소형 블랙홀 (3초, 쿨타임 2초)` },
+    { id: 'swift', ic: '💨', n: '질주', t: 'any', v: [1.1, 1.2, 1.35], d: v => `이 무기를 든 동안 이동 속도 +${pct(v - 1)}%` },
+    { id: 'exec', ic: '☠️', n: '처형', t: 'hit', v: [0.25, 0.35, 0.5], d: v => `체력 ${pct(v)}% 이하 경찰·경찰차 즉사` },
+    { id: 'reload', ic: '🔄', n: '속장전', t: 'any', v: [0.7, 0.5, 0.3], d: v => `장전 시간 ${pct(1 - v)}% 단축` }
+  ];
+  const ENCH_COST = [30000, 120000, 400000];   // 1 / 2 / 3레벨
+  const ENCH_TICKET = 50000;
+  // 무기별로 쓸 수 있는 인첸트 (화염방사기는 총알이 아니라서 일부만 · 저격총은 탄 성질형 불가)
+  const enchOk = (wIdx, e) => { const w = WP[wIdx]; if (!w || w.off) return false; if (w.flame) return e.id === 'swift' || e.id === 'reload'; if (w.hs) return !['pierce', 'split', 'storm'].includes(e.id); return true; };
+
   const pp = p => p.beach ? [p.x, p.y] : [p.h ? p.t : p.k * B + p.off, p.h ? p.k * B + p.off : p.t];
 
-  function snipe() {
-    const a = MP.aimA(), dx = Math.cos(a), dy = Math.sin(a), sl = MP.aimSl(P.z + 9); let z = P.z + 9;
+  function snipe(E) {
+    E = E || {};
+    const a = MP.aimA(), dx = Math.cos(a), dy = Math.sin(a), sl = MP.aimSl(P.z + 9), dm = 140 * dmgMul(MP.wlv(5)) * (E.crit ? 2.5 : 1); let z = P.z + 9;
     let x = P.x + dx * 10, y = P.y + dy * 10, L = 1800;
     for (let s = 0; s < 300; s++) {
       x += dx * 6; y += dy * 6; z += sl * 6;
@@ -447,17 +484,17 @@
       let hit = false;
       for (const c of [...cars]) {
         if (c !== P.car && Math.hypot(c.x - x, c.y - y) < 30 && Math.abs((c.z || 0) + 8 - z) < 60) {
-          dmgCar(c, 140 * (1 + 0.15 * MP.wlv(5))); hit = true; break;
+          dmgCar(c, dm); if (E.hit) MP.enHit({ en: E.hit, x, y, z }, 'c', c); hit = true; break;
         }
       }
       if (!hit) for (const p of peds) {
         if (p.dead > 0) continue;
-        const q = pp(p); if (Math.hypot(q[0] - x, q[1] - y) < 16) { hitPed(p, true); hit = true; break; }
+        const q = pp(p); if (Math.hypot(q[0] - x, q[1] - y) < 16) { hitPed(p, true); if (E.hit) MP.enHit({ en: E.hit, x, y, z }, 'p', p); hit = true; break; }
       }
       if (!hit) for (let j = offs.length - 1; j >= 0; j--) {
-        const o = offs[j]; if (o.dead <= 0 && Math.hypot(o.x - x, o.y - y) < 16) { o.hp -= 140 * (1 + 0.15 * MP.wlv(5)); if (o.hp <= 0) killOff(j); hit = true; break; }
+        const o = offs[j]; if (o.dead <= 0 && Math.hypot(o.x - x, o.y - y) < 16) { o.hp -= dm; if (o.hp <= 0) killOff(j); else if (E.hit) MP.enHit({ en: E.hit, x, y, z }, 'o', o); hit = true; break; }
       }
-      if (!hit && MP.pvpRay(x, y, z, 140 * (1 + 0.15 * MP.wlv(5)))) hit = true;
+      if (!hit && MP.pvpRay(x, y, z, dm)) hit = true;
       if (hit) { L = s * 6; break; }
     }
     const m = bx(L, 0.5, 0.5, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
@@ -1108,7 +1145,7 @@
         robbing.t += dt; heat = Math.max(heat, rt(r).h);
         if (robbing.t >= robbing.d) {
           const g = Math.round(rnd(rt(r).min, rt(r).max) * 5 * (MP.has('bag') ? 1.3 : 1));
-          money += g; heat = Math.min(5, heat + rt(r).hs); r.cool = r.k === 'a' ? 90 : 150; robbing = null;
+          money += g; heat = Math.min(5, heat + rt(r).hs); r.cool = MP.raid() ? 30 : r.k === 'a' ? 90 : 150; robbing = null; MP.raidRob(rt(r).d >= 7 ? 2 : 1);
           msg('💰 ' + rt(r).n + ' 강탈 성공! +$' + g.toLocaleString()); playSound('cash'); MP.loot(rt(r).n + ' 강탈 성공! +$' + g.toLocaleString() + ' (근처 팀원 30% 보너스)', g);
         }
       }
@@ -1499,7 +1536,7 @@
     }
   }
   function flameFire(dt) {
-    const w = WP[9], lv = MP.wlv(9), a = MP.aimA(), z0 = 9 + P.z + (P.jh || 0), cs = Math.cos(a), sn = Math.sin(a), R = 150 * (1 + 0.06 * lv);
+    const w = WP[9], lv = MP.wlv(9), a = MP.aimA(), z0 = 9 + P.z + (P.jh || 0), cs = Math.cos(a), sn = Math.sin(a), R = 150 * rngMul(lv);
     flAcc += dt; while (flAcc >= 0.05 && am[9] > 0) { flAcc -= 0.05; am[9]--; } if (flAcc > 0.2) flAcc = 0;
     heat = Math.min(5, heat + 0.5 * dt); shake = Math.max(shake, 1.2);
     if (flp.length < 240) for (let n = 0; n < 3; n++) {
@@ -1509,8 +1546,8 @@
     const sl = MP.aimVz(100, z0) / 100;
     const inCone = (x, y, r) => { const dx = x - P.x, dy = y - P.y, d = dx * cs + dy * sn; if (d < 0 || d > R) return false; return Math.abs(-dx * sn + dy * cs) < 10 + d * 0.2 + r; };
     for (const p of peds) { if (p.dead > 0) continue; const q = pp(p); if (inCone(q[0], q[1], 6)) { p.flT = (p.flT || 0) + dt; if (p.flT > 0.3) { p.flT = 0; hitPed(p, true); } } }
-    for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o.dead > 0) continue; if (inCone(o.x, o.y, 8)) { o.hp -= 60 * (1 + 0.15 * lv) * dt; heat = Math.min(5, heat + 0.4 * dt); if (o.hp <= 0) killOff(j); } }
-    for (const c of cars) if (c !== P.car && inCone(c.x, c.y, 16) && Math.abs((c.z || 0) + 8 - z0) < 50) dmgCar(c, 28 * (1 + 0.15 * lv) * dt);
+    for (let j = offs.length - 1; j >= 0; j--) { const o = offs[j]; if (o.dead > 0) continue; if (inCone(o.x, o.y, 8)) { o.hp -= 60 * dmgMul(lv) * dt; heat = Math.min(5, heat + 0.4 * dt); if (o.hp <= 0) killOff(j); } }
+    for (const c of cars) if (c !== P.car && inCone(c.x, c.y, 16) && Math.abs((c.z || 0) + 8 - z0) < 50) dmgCar(c, 28 * dmgMul(lv) * dt);
     MP.pvpCone(inCone, dt, lv);
     for (const d of [45, 85, 125, 150]) {
       if (d > R) break;
@@ -1555,7 +1592,7 @@
     cand.sort((a, c) => a.d - c.d); let prev = q;
     for (const e of cand.slice(0, 3)) {
       bolt(prev, e.u);
-      if (e.k === 'p') hitPed(e.o, true); else if (e.k === 'o') { e.o.hp -= 40 * (1 + 0.15 * MP.wlv(14)); if (e.o.hp <= 0) { const j = offs.indexOf(e.o); if (j >= 0) killOff(j); } } else dmgCar(e.o, 35);
+      if (e.k === 'p') hitPed(e.o, true); else if (e.k === 'o') { e.o.hp -= 40 * dmgMul(MP.wlv(14)); if (e.o.hp <= 0) { const j = offs.indexOf(e.o); if (j >= 0) killOff(j); } } else dmgCar(e.o, 35);
       prev = e.u;
     }
     MP.pvpRad(q[0], q[1], 150, 25, 14);
@@ -1898,7 +1935,7 @@
     for (let n = 0; n < 30; n++) {
       const k = Math.floor(rnd(1, N)), t = rnd(B, W - B), h = Math.random() < 0.5, x = h ? t : k * B, y = h ? k * B : t, d = Math.hypot(x - tg.x, y - tg.y);
       if (d > 600 && d < 1000) {
-        if (stars >= 4) {
+        if (stars >= 4 && !(MP.raid() && Math.random() < 0.5)) {   // 레이드에서는 일반 경찰차도 절반 섞임
           // 4성 이상: 군대 스폰 (장갑차, 탱크, 군용 공격 헬기)
           const mType = Math.random();
           if (mType < 0.45) {
@@ -1921,6 +1958,7 @@
 
   function busted() {
     if (MP.god()) { bust = 0; return; }
+    if (MP.raid()) { MP.raidBusted(); return; }   // 레이드: 체포 = 탈락 (벌금 없음)
     jk = null; for (const d of dvs) sc.remove(d.m); dvs.length = 0;
     const loss = Math.floor(money * (MP.has('vest') ? 0.15 : 0.3)); money -= loss; msg('체포됨! 벌금 -$' + loss); MP.busted(loss);
     for (let i = cars.length - 1; i >= 0; i--) if (cars[i].type === 'c' || cars[i] === P.car) cars.splice(i, 1);
@@ -1943,22 +1981,30 @@
     if (!(P.car && keys.shift && P.car.kind === 'sport')) nit = Math.min(100, nit + 14 * dt);
     if (tased > 0) tased -= dt;
     const tf = slow ? 2.8 : 1; cd -= dt * tf; dcd -= dt * tf; gcd -= dt * tf; tcd -= dt * tf;
-    if (rel > 0) { rel -= dt * tf; if (rel <= 0) { am[wi] = WP[wi].mag; msg('장전 완료'); } }
+    if (rel > 0) { rel -= dt * tf * MP.relMul(); if (rel <= 0) { am[wi] = WP[wi].mag; msg('장전 완료'); } }
     spinV = Math.max(0, spinV - dt * 1.6);
     if (P.onFoot && WP[wi].flame && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && rel <= 0 && am[wi] > 0) flameFire(dt);
 
     if (P.onFoot && !activeInterior && !jk && tased <= 0 && !P.climb && (mdown || keys.x) && cd <= 0 && rel <= 0 && !WP[wi].flame) {
       const w = WP[wi];
       if (am[wi] > 0) {
-        am[wi]--; const wlv = MP.wlv(wi); const crit = w.crit && (++pcnt % 3 === 0); if (w.spin) { cd = w.cd * (1 + (w.spin - 1) * (1 - spinV)) * (1 - 0.025 * wlv); spinV = Math.min(1, spinV + 1 / w.rampN); } else cd = w.cd * (1 - 0.025 * wlv); heat = Math.min(5, heat + w.h); shake = Math.max(shake, w.k);
+        am[wi]--; const wlv = MP.wlv(wi); const crit = w.crit && (++pcnt % 3 === 0);
+        const E = MP.fx(wi);   // v21 인첸트: 이번 발사에 적용되는 효과 (절약·급소·분열·관통·뇌전·속사·은밀·적중효과)
+        if (E.free) am[wi]++;
+        const cdm = cdMul(wlv) * E.cdm;
+        if (w.spin) { cd = w.cd * (1 + (w.spin - 1) * (1 - spinV)) * cdm; spinV = Math.min(1, spinV + 1 / w.rampN); } else cd = w.cd * cdm;
+        heat = Math.min(5, heat + w.h * E.stl); shake = Math.max(shake, w.k);
         w.mat = w.mat || new THREE.MeshBasicMaterial({ color: w.col }); w.cmat = w.cmat || new THREE.MeshBasicMaterial({ color: 0xff3030 });
-        for (let n = 0; n < w.pel; n++) {
-          const a = MP.aimA() + rnd(-w.sp, w.sp) * (aim ? 0.3 : 1), bm = new THREE.Mesh(bulG, crit ? w.cmat : w.mat);
-          bm.scale.setScalar(crit ? w.sz * 2 : w.sz); bm.position.set(P.x + Math.cos(a) * 12, 9 + P.z, P.y + Math.sin(a) * 12); sc.add(bm);
-          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * (1 + 0.15 * wlv) * (crit ? 2.2 : 1), w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z), t0: w.life, pr: w.pr || 0, pls: w.pls || 0, home: w.home || 0, thru: w.thru || 0, fall: w.fall || 0, chain: w.chain || 0, bmr: w.bmr || 0 });
-        }
-        if (!w.q) playSound('shoot'); if (crit) msg('💥 치명타!'); MP.shot(P.x, P.y, 9 + P.z + (P.jh || 0), P.a, crit ? 0xff3030 : w.col, w.sz, w.v);
-        if (w.hs) snipe();
+        const big = crit || E.crit;
+        const mkB = (a, dmM) => {
+          const bm = new THREE.Mesh(bulG, big ? w.cmat : w.mat);
+          bm.scale.setScalar(big ? w.sz * 2 : w.sz); bm.position.set(P.x + Math.cos(a) * 12, 9 + P.z, P.y + Math.sin(a) * 12); sc.add(bm);
+          bul.push({ m: bm, x: bm.position.x, y: bm.position.z, dx: Math.cos(a), dy: Math.sin(a), t: w.life, v: w.v, d: w.dmg * dmgMul(wlv) * (crit ? 2.2 : 1) * (E.crit ? 2.5 : 1) * dmM, w: wi, z: 9 + P.z, vz: MP.aimVz(w.v, 9 + P.z), t0: w.life, pr: (w.pr || 0) + E.pr, pls: w.pls || 0, home: w.home || 0, thru: w.thru || E.thru, fall: w.fall || 0, chain: w.chain || E.chain, bmr: w.bmr || 0, en: E.hit, stl: E.stl });
+        };
+        for (let n = 0; n < w.pel; n++) mkB(MP.aimA() + rnd(-w.sp, w.sp) * (aim ? 0.3 : 1), 1);
+        if (w.pel > 0) for (let s = 0; s < E.split; s++) mkB(MP.aimA() + (s % 2 ? 1 : -1) * 0.08 * (1 + (s >> 1)), 0.6);
+        if (!w.q) playSound('shoot'); if (crit) msg('💥 치명타!'); else if (E.crit) msg('🎯 급소 명중!'); MP.shot(P.x, P.y, 9 + P.z + (P.jh || 0), P.a, big ? 0xff3030 : w.col, w.sz, w.v);
+        if (w.hs) snipe(E);
         if (am[wi] === 0) rel = w.rel;
       } else rel = w.rel;
     }
@@ -2051,26 +2097,28 @@
     if (vb.ball) { const u = (T * 0.55) % 2, toward = u < 1 ? 1 : -1, k = u % 1; vb.ball.position.set(vb.x + Math.sin(T * 0.9) * 14, 14 + Math.sin(k * Math.PI) * 48, vb.y + toward * (-55 + 110 * k)); }
 
     for (let i = bul.length - 1; i >= 0; i--) {
-      const b = bul[i]; b.t -= dt; if (b.home) homeSteer(b, dt); if (b.bmr) bmrStep(b, dt); b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
+      const b = bul[i], h0 = heat; b.t -= dt; if (b.home) homeSteer(b, dt); if (b.bmr) bmrStep(b, dt); b.x += b.dx * b.v * dt; b.y += b.dy * b.v * dt; b.z = b.z || 9;
       if (b.vz) b.z += b.vz * dt;
       let dead = b.t <= 0 || !inW(b.x, b.y) || (!b.thru && !b.bmr && b.z < bh(b.x, b.y)) || (b.vz && b.z < 2);
       if (!dead) for (const c of cars) {
         if (c !== P.car && !(b.ig && b.ig.has(c)) && Math.hypot(c.x - b.x, c.y - b.y) < 32 && Math.abs((c.z || 0) + 8 - b.z) < 60) {
           dead = true; if (b.w === 4) { if (c.type === 'c') c.stun = 4; else c.stall = 4; c.v *= 0.2; }
           else if (!WP[b.w].rk) { dmgCar(c, bdm(b)); heat = Math.min(5, heat + (WP[b.w].q ? 0 : 0.3)); }
+          if (b.en) MP.enHit(b, 'c', c);
           if (pierceOk(b, c)) dead = false;
           break;
         }
       }
       if (!dead) for (const p of peds) {
         if (p.dead > 0) continue; const q = pp(p);
-        if (Math.hypot(q[0] - b.x, q[1] - b.y) < 20 && !(b.ig && b.ig.has(p))) { dead = true; hitPed(p, b.w !== 4); if (pierceOk(b, p)) dead = false; break; }
+        if (Math.hypot(q[0] - b.x, q[1] - b.y) < 20 && !(b.ig && b.ig.has(p))) { dead = true; hitPed(p, b.w !== 4); if (b.en) MP.enHit(b, 'p', p); if (pierceOk(b, p)) dead = false; break; }
       }
       if (!dead) for (let j = offs.length - 1; j >= 0; j--) {
         const o = offs[j]; if (o.dead > 0) continue;
         if (Math.hypot(o.x - b.x, o.y - b.y) < 20 && !(b.ig && b.ig.has(o))) {
           dead = true; if (b.w === 4) { o.dead = 4; o.m.rotation.z = Math.PI / 2; }
           else if (!WP[b.w].rk) { o.hp -= bdm(b); heat = Math.min(5, heat + (WP[b.w].q ? 0 : 0.3)); if (o.hp <= 0) killOff(j); }
+          if (b.en && offs[j] === o) MP.enHit(b, 'o', o);
           if (pierceOk(b, o)) dead = false;
           break;
         }
@@ -2079,6 +2127,7 @@
       if (dead) { const wd = WP[b.w]; if (wd.hole) { let hx = b.x, hy = b.y; if (solid(hx, hy, 0)) { hx -= b.dx * 20; hy -= b.dy * 20; } wellAdd(hx, hy, Math.max(14, b.z)); } if (wd.nap) napAdd(b.x, b.y); if (wd.tp) tpShot(b); if (wd.stk) stkAdd(b); if (wd.orb) orbAdd(b.x, b.y); }
       if (dead && WP[b.w].ember) napAdd(b.x, b.y, 3);
       if (dead && WP[b.w].rk) { boom(b.x, b.y, b.w === 11 ? 80 : 95, b.w === 11 ? 85 : 100); if (WP[b.w].clu) for (let k = 0; k < 3; k++) { const aa = k * 2.094 + Math.random(); boom(b.x + Math.cos(aa) * 55, b.y + Math.sin(aa) * 55, 55, 60); } }
+      if (b.stl < 1 && heat > h0) heat = h0 + (heat - h0) * b.stl;   // 은밀 인첸트: 이 탄이 올린 수배만 줄임
       b.m.position.set(b.x, b.z, b.y); if (dead) { sc.remove(b.m); bul.splice(i, 1); }
     }
 
@@ -2100,10 +2149,10 @@
         if (d > 1500 || (heat <= 0 && d > 650)) cars.splice(i, 1);
       } else if (c.type === 't' && Math.hypot(c.x - tg.x, c.y - tg.y) > 1600) cars.splice(i, 1);
     }
-    if (cars.filter(c => c.type === 't').length < 40) spawnT(true);
+    if (!MP.hall() && cars.filter(c => c.type === 't').length < 40) spawnT(true);   // 홀(로비·경매장)에서는 도시 차량을 새로 만들지 않음
 
-    const want = [0, 1, 2, 3, 5, 7][stars]; pt -= dt;
-    if (police < want && pt <= 0) { spawnPolice(); pt = 1.2; }
+    const rdOn = MP.raid(), want = rdOn ? MP.raidWant() : [0, 1, 2, 3, 5, 7][stars]; pt -= dt;
+    if (police < want && pt <= 0) { spawnPolice(); pt = rdOn ? 0.45 : 1.2; }
     if (!close && heat > 0) heat = Math.max(0, heat - 0.07 * dt);
     const sp = P.onFoot ? 0 : Math.abs(P.car.v);
 
@@ -2133,7 +2182,7 @@
       p.m.position.set(p.h ? p.t : p.k * B + p.off, 7, p.h ? p.k * B + p.off : p.t);
     }
 
-    for (const c of cash) if (Math.hypot(c.x - tg.x, c.y - tg.y) < 30) { money += 250; gren = Math.min(6, gren + 1); msg('+$250 (수류탄 +1)'); newCash(c); playSound('cash'); }
+    for (const c of cash) if (Math.hypot(c.x - tg.x, c.y - tg.y) < 30) { money += 250; if (gren < 6) gren++; msg('+$250 (수류탄 +1)'); newCash(c); playSound('cash'); }
 
     for (let i = debris.length - 1; i >= 0; i--) {
       const d = debris[i]; d.t -= dt; const m = d.m;
@@ -2232,7 +2281,7 @@
     }
 
     if (P.onFoot) {
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.fillText((rel > 0 ? '장전 중... ' : '') + WP[wi].n + (MP.wlv(wi) ? ' +' + MP.wlv(wi) : '') + (WP[wi].spin ? '  🔥예열 ' + Math.round(spinV * 100) + '%' : '') + '  ' + am[wi] + '/' + WP[wi].mag, 16, 78);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui'; ctx.fillText((rel > 0 ? '장전 중... ' : '') + WP[wi].n + (MP.wlv(wi) ? ' +' + MP.wlv(wi) : '') + MP.enTag(wi) + (WP[wi].spin ? '  🔥예열 ' + Math.round(spinV * 100) + '%' : '') + '  ' + am[wi] + '/' + WP[wi].mag, 16, 78);
       ctx.font = '16px system-ui'; ctx.fillText('[F] 대시 ' + (dcd > 0 ? dcd.toFixed(1) + 's' : '준비') + '   ·   U 상점 · Tab 플레이어 · M 지도 · P 마우스', 16, 102);
     }
 
@@ -2722,6 +2771,8 @@
     function joinCode(c) {
       c = String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
       if (c.length < 4) { addFeed('방 코드를 확인해 주세요', '#f66'); return; }
+      if (hallOf(c) && activeInterior) { addFeed('건물 안에서는 이동할 수 없어요 · 밖에서 다시 입력해 주세요', '#f66'); return; }
+      if (c.startsWith('RI') && c.length === 6 && room !== c) { addFeed('🚔 레이드 방은 로비(LLLLL)의 발판에서만 들어갈 수 있어요', '#f66'); return; }
       $('mpJoin').value = ''; blurUI(); go(c);
     }
 
@@ -2730,6 +2781,7 @@
       if (code === ARENA && !own.pvp) { addFeed('⚔️ 방 WWWWW는 PvP 모드를 산 사람만 들어올 수 있어요 (상점 $500,000)', '#f66'); msg('PvP 모드를 먼저 사야 입장할 수 있어요'); code = myCode; }
       if (code !== ARENA) { arenaIn = false; arenaOff(); }
       if (ride) exitRide(true);
+      { const hk = hallOf(code), rd = isRaid(code); if (hk) hallEnter(hk); else hallLeave(rd); if (rd) raidStart(code); else if (raid) raidStop(); }   // v21: 방 코드 LLLLL(로비) / UUUUU(경매장) = 도시 밖 홀, RI**** = 레이드 방
       if (ch) { try { sb.removeChannel(ch); } catch (e) {} ch = null; }
       for (const id of [...remotes.keys()]) dropRemote(id, true);
       room = code; status = '연결 중...'; refreshUI();
@@ -2761,6 +2813,9 @@
       on('cx', d => npcCarKill(d));
       on('hit', d => { if (d.to === myId) onHit(d); });
       on('reward', d => { if (d.to === myId) { money += d.amt; msg(d.text); playSound('cash'); } });
+      on('lob', d => lobRecv(d));
+      on('rrob', d => raidRecvRob(d));
+      on('rst', d => raidRecvState(d));
       on('guide', d => guideRecv(d));
       on('abomb', d => abRecv(d));
       on('pvp', d => { if (d.to === myId) pvpRecv(d); });
@@ -3220,6 +3275,7 @@
       { id: 'pvp', ic: '⚔️', get n() { return 'PvP 모드' + (own.pvp ? (own.pvpOn ? ' · 켜짐' : ' · 꺼짐') : ''); }, get d() { return own.pvp ? '클릭하면 켜기/끄기 · 켠 사람끼리만 서로 데미지 · 죽으면 돈 10%를 처치한 사람이 가져가요' : 'PvP를 켠 사람끼리만 서로 공격 · 상점에서 언제든 켜고 끌 수 있어요'; }, p: 500000, perm: 'pvp', tg: () => own.pvpOn ? 'ON' : 'OFF' },
       { id: 'chute', ic: '🪂', n: '낙하산', d: '높은 곳에서 떨어져도 착지 충격 없음 (영구)', p: 60000, perm: 'chute' },
       { id: 'vest', ic: '🦺', n: '방탄조끼', d: '체포 벌금 절반 · PvP 피해 25% 감소 (영구)', p: 90000, perm: 'vest' },
+      { id: 'ench', ic: '🔮', n: '인첸트 이용권', d: '무기 강화소에 🔮 인첸트 탭이 영구히 열려요 · 15종 × 최대 3레벨 (부여 비용은 강화소에서 따로)', p: ENCH_TICKET, perm: 'ench' },
       { id: 'bag', ic: '💼', n: '현금 가방', d: '강도 보상 +30% (영구) · 기본 강도 보상도 5배', p: 120000, perm: 'bag' },
       { id: 'can', ic: '🛢️', n: '휴대용 연료통', d: '타고 있는 차 연료를 가득 채움', p: 2500 },
       { id: 'nitro', ic: '🏎️', n: '니트로', d: '30초간 차 최고속도 +40%', p: 12000 }
@@ -3408,8 +3464,10 @@
       profBusy = false;
     }
     // 관리자 수정 즉시 반영 (3초마다 확인)
-    async function admPoll() {
-      if (!sb || guest || !profReady || admBusy || document.hidden) return; admBusy = true; const nm = myName;
+    async function admPoll(force) {
+      if (!sb || guest || !profReady || (document.hidden && !force)) return;
+      if (admBusy) { if (!force) return; for (let k = 0; k < 40 && admBusy; k++) await new Promise(r => setTimeout(r, 50)); if (admBusy) return; }
+      admBusy = true; const nm = myName;
       try {
         const { data, error } = await sb.from('cc_profiles').select('adm_seq,adm').eq('name', nm).maybeSingle();
         if (nm !== myName || error) return;
@@ -3424,11 +3482,13 @@
             if (wi >= 6 && !own[wi]) wi = 0;
           }
           LS.set('cc_own', JSON.stringify(own)); LS.set('cc_money', String(money)); profSig = JSON.stringify([Math.round(money), own]);
-          title('🛠 관리자 수정', `돈 $${Math.round(money).toLocaleString()} · 무기/강화가 바뀌었어요`, '#ffd23f'); addFeed('🛠 관리자가 내 계정을 수정했어요', '#ffd23f'); playSound('cash'); if (shopOpen) renderShop();
+          if (a.src === 'auction') { title('🔨 경매장', a.note || '거래가 반영됐어요', '#ffd23f'); addFeed('🔨 경매장 거래 반영: ' + (a.note || ''), '#ffd23f'); }
+          else { title('🛠 관리자 수정', `돈 $${Math.round(money).toLocaleString()} · 무기/강화가 바뀌었어요`, '#ffd23f'); addFeed('🛠 관리자가 내 계정을 수정했어요', '#ffd23f'); }
+          playSound('cash'); if (shopOpen) renderShop(); if (panel) renderPanel();
         }
       } catch (e) {} finally { admBusy = false; }
     }
-    setInterval(admPoll, 2000);
+    setInterval(() => admPoll(), 2000);
     // 개발자 도구 감지 → 저장·멀티 중지 + 차단 화면 (이 기기 콘솔로 돈 조작 방지)
     let devOpen = false;
     function devBlock() {
@@ -3605,10 +3665,47 @@
     // ================================================================ v4 시스템 (차 가게 · 차키 · 안내 화살표 · 웨이포인트 · 그래플링 · 강화소)
     own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
     const ownCar = new Map();               // 차 id → 실제 차량 객체
-    function stripOff() { for (let i = 6; i < WP.length; i++) if (WP[i].off) { delete own[i]; if (own.wu) delete own.wu[i]; } if (WP[wi] && WP[wi].off) wi = 0; }
+    function stripOff() {
+      for (let i = 6; i < WP.length; i++) if (WP[i].off) { delete own[i]; if (own.wu) delete own.wu[i]; if (own.en) delete own.en[i]; } if (WP[wi] && WP[wi].off) wi = 0;
+      if (own.gren !== undefined) gren = Math.max(0, own.gren | 0); if (own.tnt !== undefined) tnt = Math.max(0, own.tnt | 0);   // v21: 수류탄·TNT 개수도 계정에 저장 (경매장 거래용)
+    }
     const saveOwn = () => { LS.set('cc_own', JSON.stringify(own)); };
     const fmt = n => '$' + Math.round(n).toLocaleString();
     const wlv = i => (own.wu && own.wu[i]) || 0;
+    // ---------------------------------------------------------------- v21 인첸트 (own.en = { 무기번호: [인첸트번호, 레벨1~3] } · own.ench = 이용권)
+    const enOf = i => { const e = own.en && own.en[i]; if (!e || !ENCH[e[0]] || !enchOk(i, ENCH[e[0]])) return null; const lv = Math.max(1, Math.min(3, e[1] | 0)); return { d: ENCH[e[0]], lv, v: ENCH[e[0]].v[lv - 1] }; };
+    const enTag = i => { const e = enOf(i); return e ? ` ${e.d.ic}${e.d.n}${'I'.repeat(e.lv)}` : ''; };
+    let enGate = 0;
+    function fxShot(i) {   // 발사할 때마다 한 번 호출 → 이번 발사에 적용되는 인첸트 효과
+      const r = { free: false, crit: false, split: 0, pr: 0, thru: 0, chain: 0, cdm: 1, stl: 1, hit: null }, e = enOf(i);
+      if (!e) return r; const id = e.d.id, v = e.v;
+      if (id === 'saver') r.free = Math.random() < v;
+      else if (id === 'crit') r.crit = Math.random() < v;
+      else if (id === 'split') r.split = v;
+      else if (id === 'pierce') { r.pr = v; r.thru = v >= 3 ? 1 : 0; }
+      else if (id === 'storm') r.chain = Math.random() < v ? 1 : 0;
+      else if (id === 'haste') r.cdm = v;
+      else if (id === 'ghost') r.stl = v;
+      else if (e.d.t === 'hit') r.hit = { id, v, lv: e.lv };
+      return r;
+    }
+    function enHit(b, k, t) {   // 총알이 무언가에 맞았을 때 (k: c 차 · p 시민 · o 경찰관)
+      const e = b.en; if (!e) return; const id = e.id, v = e.v, now = performance.now();
+      if (id === 'fire') { if (Math.random() < v && now - enGate > 120) { enGate = now; napAdd(b.x, b.y, 1.2 + e.lv * 0.8); } }
+      else if (id === 'blast') { if (Math.random() < v && now - enGate > 250) { enGate = now; boom(b.x, b.y, 38 + e.lv * 14, 35 + e.lv * 30); } }
+      else if (id === 'loot') { money += v; if (now - enGate > 400) { enGate = now; playSound('cash'); } }
+      else if (id === 'frost') {
+        if (k === 'c' && cars.includes(t)) { if (t.type === 'c') { t.stun = Math.max(t.stun || 0, v); t.v *= 0.2; } else if (t.type === 't') t.stall = Math.max(t.stall || 0, v); }
+        else if (k === 'o') { const j = offs.indexOf(t); if (j >= 0) { t.dead = Math.max(t.dead || 0, v); t.m.rotation.z = Math.PI / 2; } }
+      }
+      else if (id === 'well') { if (Math.random() < v && now - enGate > 2000) { enGate = now; wellAdd(b.x, b.y, 14); } }
+      else if (id === 'exec') {
+        if (k === 'o') { const j = offs.indexOf(t); if (j >= 0 && t.hp <= 60 * v) killOff(j); }
+        else if (k === 'c' && t.type === 'c' && cars.includes(t) && t.hp <= (t.mhp || 100) * v) dmgCar(t, 99999);
+      }
+    }
+    const relMul = () => { const e = enOf(wi); return e && e.d.id === 'reload' ? 1 / e.v : 1; };
+    const swiftMul = () => { const e = P.onFoot ? enOf(wi) : null; return e && e.d.id === 'swift' ? e.v : 1; };
     let panel = null, wpBusy = false, stNear = null, ghCd = 0;
     const v4css = document.createElement('style');
     v4css.textContent = `.v4p{position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.66);font-family:system-ui}
@@ -3626,13 +3723,15 @@
       .v4p .row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px} .v4p .row .nm{flex:1} .v4p .row .ds{margin:2px 0 0}
       .v4p .btn{padding:7px 14px;border-radius:9px;background:#ffd23f;color:#111;font:800 13px system-ui;cursor:pointer;user-select:none;white-space:nowrap} .v4p .btn.dis{opacity:.4;cursor:default;background:#888}
       .v4p .btn.o{background:#ff9a3d} .v4p .res{margin-top:8px;text-align:center;font:700 15px system-ui;min-height:20px}
+      .v4p .tbs{display:flex;gap:6px;margin-bottom:10px} .v4p .tb{padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.08);font:800 13px system-ui;cursor:pointer;user-select:none} .v4p .tb.on{background:#ff9a3d;color:#111}
+      .v4p select.es{padding:6px 8px;border-radius:8px;border:1px solid #555;background:#0b0e14;color:#fff;font:13px system-ui;max-width:160px}
       #wpIn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;display:none;padding:14px 16px;background:#12151d;border:1.5px solid #ffd23f;border-radius:14px;color:#fff;font:14px system-ui;box-shadow:0 20px 50px rgba(0,0,0,.6)}
       #wpIn input{display:block;margin-top:8px;width:260px;padding:8px 10px;border-radius:8px;border:1px solid #666;background:#0b0e14;color:#fff;font:15px system-ui}
     `;
     document.head.appendChild(v4css);
     const mkPanel = (cls, html) => { const e = document.createElement('div'); e.className = 'v4p ' + cls; e.innerHTML = html; document.body.appendChild(e); for (const ev of ['mousedown', 'mouseup', 'click', 'touchstart']) e.addEventListener(ev, x => { x.stopPropagation(); if (x.target === e && ev === 'click') closePanel(); }); return e; };
     const dealEl = mkPanel('deal', '<div class="bx"><div class="hd"><b>🚗 차 가게 — CAR SHOP</b><span id="dlMoney"></span></div><div class="gr" id="dlGr"></div><div class="ft">클릭해서 구매 · 산 차는 절대 부서지지 않아요 · L 차키로 어디서든 호출 · E / Esc 닫기</div></div>');
-    const enhEl = mkPanel('enh', '<div class="bx"><div class="hd"><b>⚒️ 무기 강화소</b><span id="enMoney"></span></div><div id="enList"></div><div class="res" id="enRes"></div><div class="ft">강화할수록 데미지 +15% · 연사 +2.5% · 확률 실패 시 +6 이상은 단계 하락 · 최대 +10 · E / Esc 닫기</div></div>');
+    const enhEl = mkPanel('enh', '<div class="bx"><div class="hd"><b>⚒️ 무기 강화소</b><span id="enMoney"></span></div><div class="tbs" id="enTabs"></div><div id="enList"></div><div class="res" id="enRes"></div><div class="ft">강화 최대 +99 · +10까지 데미지 +15%·연사 +2.5%씩, 이후는 완만하게 · 실패 시 −1단계는 +6~+9에서만 · 인첸트는 무기당 1개 · E / Esc 닫기</div></div>');
     const keysEl = mkPanel('keys', '<div class="bx"><div class="hd"><b>🔑 차키 목록</b><span id="kyInfo"></span></div><div id="kyList"></div><div class="ft">호출 = 가까운 주차장에 차 소환 + 화살표 안내 · L / Esc 닫기</div></div>');
     const wpEl = document.createElement('div'); wpEl.id = 'wpIn'; wpEl.innerHTML = '<div>📍 웨이포인트 이름 (Enter 저장 · Esc 취소)</div><input id="wpName" maxlength="14" placeholder="예: 우리집, 옥상 아지트">'; document.body.appendChild(wpEl);
     const wpName = wpEl.querySelector('input');
@@ -3704,7 +3803,7 @@
       panel = k; mdown = false; panels[k].style.display = 'flex'; renderPanel(); if (k === 'deal') gsSync();
     }
     function closePanel(quiet) { if (!panel) return; panels[panel].style.display = 'none'; panel = null; if (!quiet) setTimeout(reqLock, 0); }
-    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); else if (panel === 'atm') renderAtm(true); else if (panel === 'cas') renderCas(); }
+    function renderPanel() { if (panel === 'deal') renderDeal(); else if (panel === 'enh') renderEnh(); else if (panel === 'keys') renderKeys(); else if (panel === 'atm') renderAtm(true); else if (panel === 'cas') renderCas(); else if (panel === 'auc') renderAuc(); }
 
     // ---------------------------------------------------------------- 차 가게
     let dealHl = null;
@@ -3728,34 +3827,68 @@
       renderDeal();
     }
 
-    // ---------------------------------------------------------------- 무기 강화소
-    const ENH_CH = [90, 80, 70, 60, 50, 40, 32, 25, 18, 12];
-    const enhCost = lv => Math.round(1500 * Math.pow(1.55, lv) / 100) * 100;
+    // ---------------------------------------------------------------- 무기 강화소 (강화 최대 +99 · 인첸트 탭은 이용권($50,000)을 사야 열림)
+    let enTab = 'enh'; const enSel = {};
+    const enNote = (t, ok) => { $('enRes').style.color = ok ? '#6f6' : '#f66'; $('enRes').textContent = t; };
     function renderEnh() {
       $('enMoney').textContent = '💰 ' + fmt(money);
+      $('enTabs').innerHTML = `<span class="tb${enTab === 'enh' ? ' on' : ''}" data-tab="enh">⚒ 강화</span><span class="tb${enTab === 'ench' ? ' on' : ''}" data-tab="ench">🔮 인첸트${own.ench ? '' : ' 🔒'}</span>`;
       let h = '';
-      for (let i = 0; i < WP.length; i++) {
-        if (i >= 6 && !own[i]) continue;
-        const lv = wlv(i), mx = lv >= 10;
-        h += `<div class="row"><div class="nm">${WP[i].n} <span style="color:#ffb347">${lv ? '+' + lv : ''}</span><div class="ds">${mx ? 'MAX 강화 완료' : `성공 ${ENH_CH[lv]}% · 비용 ${fmt(enhCost(lv))}${lv >= 6 ? ' · 실패 시 −1단계' : ''}`} · 데미지 ×${(1 + 0.15 * lv).toFixed(2)}</div></div><div class="btn o${mx || money < enhCost(lv) ? ' dis' : ''}" data-i="${i}">${mx ? 'MAX' : '강화'}</div></div>`;
+      if (enTab === 'ench' && !own.ench) {
+        h = `<div class="ds" style="padding:22px;text-align:center;line-height:1.7">🔒 <b>인첸트 이용권</b>이 필요해요<br>상점(U)에서 <b>${fmt(ENCH_TICKET)}</b>에 사면 이 탭이 영구히 열려요<br>무기마다 인첸트 1개 · 15종 · 최대 3레벨</div>`;
+      } else if (enTab === 'ench') {
+        for (let i = 0; i < WP.length; i++) {
+          if (WP[i].off || (i >= 6 && !own[i])) continue;
+          const cur = own.en && own.en[i], list = ENCH.map((e, k) => [e, k]).filter(([e]) => enchOk(i, e));
+          if (!list.length) continue;
+          let sel = enSel[i] !== undefined ? enSel[i] : (cur ? cur[0] : list[0][1]); if (!list.some(([, k]) => k === sel)) sel = list[0][1]; enSel[i] = sel;
+          const e = ENCH[sel], same = cur && cur[0] === sel, nl = same ? Math.min(3, cur[1] + 1) : 1, mx = same && cur[1] >= 3, cost = ENCH_COST[nl - 1];
+          h += `<div class="row" style="flex-wrap:wrap"><div class="nm" style="min-width:150px">${WP[i].n}${wlv(i) ? ` <span style="color:#ffb347">+${wlv(i)}</span>` : ''}<div class="ds">${cur && ENCH[cur[0]] ? `현재 ${ENCH[cur[0]].ic} ${ENCH[cur[0]].n} Lv${cur[1]}` : '인첸트 없음'}</div></div>`
+            + `<select class="es" data-i="${i}">${list.map(([x, k]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${x.ic} ${x.n}</option>`).join('')}</select>`
+            + `<div class="btn o${mx || money < cost ? ' dis' : ''}" data-en="${i}">${mx ? 'MAX' : (same ? `Lv${nl} 강화 ${fmt(cost)}` : (cur ? `교체 ${fmt(cost)}` : `부여 ${fmt(cost)}`))}</div>`
+            + `<div class="ds" style="flex-basis:100%;margin:0">${e.ic} ${e.n} ${[1, 2, 3].map(l => `<b${(cur && cur[0] === sel && cur[1] === l) ? ' style="color:#ffd23f"' : ''}>Lv${l}</b>: ${e.d(e.v[l - 1])}`).join(' · ')}</div></div>`;
+        }
+        h += '<div class="ds" style="text-align:center;margin-top:6px">다른 인첸트로 교체하면 기존 인첸트는 사라져요 · 인첸트는 경매에 팔 때 무기와 함께 가요</div>';
+      } else {
+        for (let i = 0; i < WP.length; i++) {
+          if (WP[i].off || (i >= 6 && !own[i])) continue;
+          const lv = wlv(i), mx = lv >= ENH_MAX;
+          h += `<div class="row"><div class="nm">${WP[i].n} <span style="color:#ffb347">${lv ? '+' + lv : ''}</span>${enTag(i) ? `<span style="color:#c9a6ff;font-size:12px">${enTag(i)}</span>` : ''}<div class="ds">${mx ? 'MAX 강화 완료 (+99)' : `성공 ${enhChance(lv)}% · 비용 ${fmt(enhCost(lv))}${ENH_DROP(lv) ? ' · 실패 시 −1단계' : ''}`} · 데미지 ×${dmgMul(lv).toFixed(2)} · 연사 ×${(1 / cdMul(lv)).toFixed(2)}</div></div><div class="btn o${mx || money < enhCost(lv) ? ' dis' : ''}" data-i="${i}">${mx ? 'MAX' : '강화'}</div></div>`;
+        }
       }
       $('enList').innerHTML = h;
     }
-    enhEl.addEventListener('click', e => { const t = e.target.closest('.btn'); if (t && t.dataset.i !== undefined) enhance(+t.dataset.i); });
+    enhEl.addEventListener('click', e => {
+      const tb = e.target.closest('.tb'); if (tb) { enTab = tb.dataset.tab; $('enRes').textContent = ''; renderEnh(); return; }
+      const t = e.target.closest('.btn'); if (!t) return;
+      if (t.dataset.i !== undefined) enhance(+t.dataset.i); else if (t.dataset.en !== undefined) enchant(+t.dataset.en);
+    });
+    enhEl.addEventListener('change', e => { const s = e.target.closest('.es'); if (s) { enSel[+s.dataset.i] = +s.value; renderEnh(); } });
     function enhance(i) {
-      const lv = wlv(i); if (lv >= 10) return;
-      const cost = enhCost(lv); if (money < cost) { $('enRes').style.color = '#f66'; $('enRes').textContent = `돈이 부족해요 (${fmt(cost - money)} 더 필요)`; playSound('shoot'); return; }
-      money -= cost;
-      if (Math.random() * 100 < ENH_CH[lv]) {
-        own.wu[i] = lv + 1; $('enRes').style.color = '#6f6'; $('enRes').textContent = `✨ 강화 성공! ${WP[i].n} +${lv + 1}`; playSound('cash');
-        if (lv + 1 >= 7) event(`님이 ${WP[i].n}을(를) +${lv + 1} 강화에 성공했습니다! 🔨`);
+      const lv = wlv(i); if (lv >= ENH_MAX) return;
+      const cost = enhCost(lv); if (money < cost) { enNote(`돈이 부족해요 (${fmt(cost - money)} 더 필요)`, 0); playSound('shoot'); return; }
+      money -= cost; own.wu = own.wu || {};
+      if (Math.random() * 100 < enhChance(lv)) {
+        own.wu[i] = lv + 1; enNote(`✨ 강화 성공! ${WP[i].n} +${lv + 1}`, 1); playSound('cash');
+        if (lv + 1 >= 7 && (lv + 1 <= 10 || (lv + 1) % 5 === 0)) event(`님이 ${WP[i].n}을(를) +${lv + 1} 강화에 성공했습니다! 🔨`);
+        if (lv + 1 === ENH_MAX) title('🔨 99강 달성!', `${myName} · ${WP[i].n} +99`, '#ffd23f');
       } else {
-        $('enRes').style.color = '#f66';
-        if (lv >= 6) { own.wu[i] = lv - 1; $('enRes').textContent = `💥 강화 실패... ${WP[i].n} +${lv} → +${lv - 1}`; }
-        else $('enRes').textContent = `💨 강화 실패 (단계 유지) ${WP[i].n} +${lv}`;
+        if (ENH_DROP(lv)) { own.wu[i] = lv - 1; enNote(`💥 강화 실패... ${WP[i].n} +${lv} → +${lv - 1}`, 0); }
+        else enNote(`💨 강화 실패 (단계 유지) ${WP[i].n} +${lv}`, 0);
         playSound('boom');
       }
       saveOwn(); renderEnh();
+    }
+    function enchant(i) {
+      if (!own.ench) { enNote('인첸트 이용권이 필요해요', 0); return; }
+      const sel = enSel[i]; if (sel === undefined || !ENCH[sel] || !enchOk(i, ENCH[sel])) return;
+      const cur = own.en && own.en[i], same = cur && cur[0] === sel; if (same && cur[1] >= 3) return;
+      const nl = same ? cur[1] + 1 : 1, cost = ENCH_COST[nl - 1];
+      if (money < cost) { enNote(`돈이 부족해요 (${fmt(cost - money)} 더 필요)`, 0); playSound('shoot'); return; }
+      money -= cost; own.en = own.en || {}; own.en[i] = [sel, nl]; saveOwn(); playSound('cash');
+      enNote(`🔮 ${WP[i].n} · ${ENCH[sel].ic} ${ENCH[sel].n} Lv${nl}`, 1);
+      if (nl === 3) event(`님이 ${WP[i].n}에 ${ENCH[sel].ic} ${ENCH[sel].n} Lv3 인첸트를 완성했습니다!`);
+      renderEnh();
     }
 
     // ---------------------------------------------------------------- 차키 (L) · 호출
@@ -3776,7 +3909,7 @@
       cars.splice(cars.indexOf(best), 1); if (guide && guide.car === best) clearGuide();
       msg('🅿️ 주차 완료! 차가 보관소로 들어갔어요 · L 키로 다시 호출'); playSound('cash');
     }
-    function toggleKeys() { if (panel === 'keys') closePanel(); else openPanel('keys'); }
+    function toggleKeys() { if (panel === 'keys') closePanel(); else if (hall) msg('홀 안에서는 차를 부를 수 없어요'); else openPanel('keys'); }
     function callCar(id) {
       const d = CARM[id]; if (!d || !own.cars[id]) return;
       const o = P.onFoot ? P : P.car; let lot = null, bd = 1e12;
@@ -4023,7 +4156,7 @@
     function pvpRad(x, y, rad, dmg, w) { if (!pvpOn()) return; for (const r of remotes.values()) if (r.pv && !r.gd && Math.hypot((r.x || 0) - x, (r.y || 0) - y) < rad) pvpHit(r, dmg, w); }
     function pvpCone(inCone, dt, lv) {
       if (!pvpOn()) return;
-      for (const r of remotes.values()) if (r.pv && !r.gd && inCone(r.tx || 0, r.ty || 0, 8)) { r.flT = (r.flT || 0) + dt; if (r.flT > 0.3) { r.flT = 0; pvpHit(r, 9 * (1 + 0.15 * lv), 9); } }
+      for (const r of remotes.values()) if (r.pv && !r.gd && inCone(r.tx || 0, r.ty || 0, 8)) { r.flT = (r.flT || 0) + dt; if (r.flT > 0.3) { r.flT = 0; pvpHit(r, 9 * dmgMul(lv), 9); } }
     }
     function pvpRay(x, y, z, d) {
       if (!pvpOn()) return false;
@@ -4049,6 +4182,330 @@
       title('💀 처치당함', `${k ? k.name + ' 님에게 ' : ''}당했어요 · -$${loss.toLocaleString()} · 5초간 무적`, '#ff5a5a'); addFeed(`💀 ${k ? k.name + ' 님에게 ' : ''}처치당했어요 (-$${loss.toLocaleString()})`, '#f66');
     }
 
+    // ---------------------------------------------------------------- v21 🏛 홀: 로비(방 코드 LLLLL) · 경매장(방 코드 UUUUU)
+    const LOBBY = 'LLLLL', AUCTION = 'UUUUU';
+    let hall = null, hallBack = null, hallBuilt = false;
+    const hallOf = code => code === LOBBY ? 'L' : code === AUCTION ? 'U' : null;
+    const hallObjs = k => { const q = HALLS[k]; return { desk: k === 'U' ? { x: q.x, y: q.y - 40, r: 100 } : null, exit: { x: q.x, y: q.y + 300, r: 55 } }; };
+    function hallBuild() {
+      if (hallBuilt) return; hallBuilt = true;
+      for (const k of ['L', 'U']) {
+        const q = HALLS[k], A = k === 'U', o = hallObjs(k), g = new THREE.Group();
+        const fl = bx(q.h * 2, 2, q.h * 2, M(A ? 0x3a2f4d : 0x26384d)); fl.position.set(q.x, -0.8, q.y); g.add(fl);   // 윗면 y=0.2
+        const tl = M(A ? 0x4b3d66 : 0x31475f);
+        for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) if ((i + j) & 1) { const t = bx(60, 0.5, 60, tl); t.position.set(q.x + i * 60, 0.45, q.y + j * 60); g.add(t); }
+        const wm = new THREE.MeshBasicMaterial({ color: A ? 0xffd23f : 0x38e8ff, transparent: true, opacity: 0.26, side: THREE.DoubleSide, depthWrite: false });
+        for (const [x, y, w, d] of [[q.x, q.y - q.h, q.h * 2, 6], [q.x, q.y + q.h, q.h * 2, 6], [q.x - q.h, q.y, 6, q.h * 2], [q.x + q.h, q.y, 6, q.h * 2]]) { const m = bx(w, 220, d, wm); m.position.set(x, 110, y); g.add(m); }
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 170, 10), M(A ? 0xd4af37 : 0x6fd3ff)); p.position.set(q.x + sx * 300, 85, q.y + sy * 300); g.add(p); }
+        const ep = new THREE.Mesh(new THREE.CylinderGeometry(o.exit.r, o.exit.r, 1.5, 28), M(0x2ecc71)); ep.position.set(o.exit.x, 0.95, o.exit.y); g.add(ep);
+        sgn('🚪 나가기', '#0b3d1f', '#9dffbf', o.exit.x, 46, o.exit.y + 62, 120, 30, 0);
+        if (A) {
+          const dk = bx(170, 26, 46, M(0xb8860b)); dk.position.set(o.desk.x, 13, o.desk.y); g.add(dk);
+          const tp = bx(176, 3, 52, M(0xffd23f)); tp.position.set(o.desk.x, 27, o.desk.y); g.add(tp);
+          const ham = bx(14, 14, 14, M(0xffffff)); ham.position.set(o.desk.x, 36, o.desk.y); g.add(ham);
+          sgn('🔨 경매장', '#2b1d4a', '#ffd23f', q.x, 130, q.y - q.h + 8, 320, 80, 0);
+          sgn('강화한 무기 · 수류탄 · TNT · 원자폭탄', '#2b1d4a', '#ffe9a6', q.x, 70, q.y - q.h + 8, 320, 30, 0);
+          sgn('[E] 경매 데스크', '#3b2a00', '#fff1a8', o.desk.x, 62, o.desk.y + 30, 150, 28, 0);
+          for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const pd = bx(36, 14, 36, M(0x6b5b95)); pd.position.set(q.x + sx * 220, 7, q.y - 170 + i * 80); g.add(pd); const gm = bx(16, 16, 16, M([0xff5a5a, 0x5affb0, 0x6aa8ff][i])); gm.position.set(q.x + sx * 220, 24, q.y - 170 + i * 80); gm.rotation.y = 0.8; g.add(gm); }
+        } else {
+          sgn('🚔 경찰 레이드 로비', '#10223f', '#7fe7ff', q.x, 130, q.y - q.h + 8, 340, 80, 0);
+          const lp = lobPad(), pd = new THREE.Mesh(new THREE.CylinderGeometry(lp.r, lp.r, 1.5, 40), new THREE.MeshBasicMaterial({ color: 0x1fa8ff, transparent: true, opacity: 0.55 })); pd.position.set(lp.x, 0.95, lp.y); g.add(pd);
+          const rg = new THREE.Mesh(new THREE.TorusGeometry(lp.r, 3, 8, 48), new THREE.MeshBasicMaterial({ color: 0x9be7ff })); rg.rotation.x = Math.PI / 2; rg.position.set(lp.x, 2.2, lp.y); g.add(rg);
+          sgn('⬇ 입장 발판 ⬇', '#0b2b4d', '#bff3ff', lp.x, 60, lp.y - lp.r - 6, 200, 34, 0);
+          sgn('난이도 3단계 · 인원 1~4명 · 모두 서면 3초 뒤 출발', '#0b2b4d', '#9be7ff', q.x, 70, q.y - q.h + 8, 340, 30, 0);
+        }
+        sc.add(g);
+      }
+    }
+    function hallEnter(k) {
+      if (hall === k) return;
+      hallBuild();
+      if (!hallBack) { const o = P.onFoot ? P : (P.car || P); hallBack = { x: o.x, y: o.y }; }
+      hall = k;
+      if (ride) exitRide(true);
+      if (!P.onFoot && P.car) { const c = P.car; c.type = 'k'; c.v = 0; P.car = null; P.onFoot = true; }
+      jk = null; robbing = null; P.gh = null; P.z = 0; P.roof = null; P.climb = 0; P.air = 0; tased = 0; scope = false; heat = 0; bust = 0; martial = false;
+      const q = HALLS[k]; P.x = q.x + rnd(-40, 40); P.y = q.y + 230; P.a = -Math.PI / 2;
+      title(k === 'U' ? '🔨 경매장' : '🚔 레이드 로비', k === 'U' ? '가운데 데스크에서 E · 초록 발판 = 나가기' : '파란 발판에 서면 난이도 선택 · 초록 발판 = 나가기', k === 'U' ? '#ffd23f' : '#38e8ff');
+    }
+    function hallLeave(keep) {   // keep = 레이드로 가는 중이면 원래 도시 위치(hallBack)를 보관
+      const was = hall; hall = null; if (was && panel === 'auc') closePanel(true);
+      if (keep || (!was && !hallBack)) return;
+      const b = hallBack; hallBack = null; P.z = 0; P.roof = null; P.climb = 0;
+      if (b) { P.x = b.x; P.y = b.y; } else { P.x = Math.round(rnd(2, N - 2)) * B; P.y = Math.round(rnd(2, N - 2)) * B + 40; }
+      let ok = !solid(P.x, P.y, 10);
+      for (let r = 20; r <= 600 && !ok; r += 20) for (let a = 0; a < 8 && !ok; a++) { const x = b ? b.x + Math.cos(a * 0.785) * r : P.x, y = b ? b.y + Math.sin(a * 0.785) * r : P.y; if (!solid(x, y, 10)) { P.x = x; P.y = y; ok = true; } }
+      title('🏙 도시로 돌아왔어요', '', '#7bd44a');
+    }
+    function hallTick(dt) {
+      heat = 0; bust = 0;
+      const q = HALLS[hall], o = P.onFoot ? P : (P.car || P);
+      o.x = Math.max(q.x - q.h + 12, Math.min(q.x + q.h - 12, o.x)); o.y = Math.max(q.y - q.h + 12, Math.min(q.y + q.h - 12, o.y));
+      if (hall === 'L' && typeof lobTick === 'function') lobTick(dt);
+    }
+    const hNearOf = (p, r) => Math.hypot(P.x - p.x, P.y - p.y) < r;
+    function hallNear() {
+      const o = hallObjs(hall);
+      if (o.desk && hNearOf(o.desk, o.desk.r)) return '🔨 경매장 열기';
+      if (hNearOf(o.exit, o.exit.r)) return '🚪 도시로 나가기';
+      return hall === 'L' ? lobNear() : null;
+    }
+    function hallE() {
+      const o = hallObjs(hall);
+      if (o.desk && hNearOf(o.desk, o.desk.r)) { aucOpen(); return true; }
+      if (hNearOf(o.exit, o.exit.r)) { go(myCode); return true; }
+      return false;
+    }
+
+    // ---------------------------------------------------------------- v21 🔨 경매장 (서버 함수가 거래를 처리 · 무기 복제 불가)
+    (() => { const st = document.createElement('style'); st.textContent = `.v4p.auc .bx{border-color:rgba(255,210,63,.6)}.v4p.auc .hd b{color:#ffd23f}
+      .v4p input.ai{width:120px;padding:6px 8px;border-radius:8px;border:1px solid #555;background:#0b0e14;color:#fff;font:13px system-ui}
+      .v4p .row .pr{margin:0 4px;white-space:nowrap}.v4p .sec{margin:12px 0 6px;font:800 13px system-ui;color:#ffd23f}.v4p .row.dim{opacity:.5}
+      .v4p .aul{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.v4p .aul small{color:rgba(255,255,255,.55);font:11px system-ui}`; document.head.appendChild(st); })();
+    const aucEl = mkPanel('auc', '<div class="bx"><div class="hd"><b>🔨 경매장</b><span id="auMoney"></span></div><div class="tbs" id="auTabs"></div><div id="auBody"></div><div class="res" id="auRes"></div><div class="ft">강화한 무기(+1 이상)와 수류탄·TNT·원자폭탄을 올릴 수 있어요 · 기본 무기(권총~저격총)는 판매 불가 · 올리면 바로 내 계정에서 빠져요(취소하면 돌려받음) · 동시에 8개까지 · E / Esc 닫기</div></div>');
+    panels.auc = aucEl;
+    const AUC_K = { gren: ['💣', '수류탄'], tnt: ['🧨', 'TNT'], ab: ['☢️', ABN] };
+    const AUC_ERR = { base_weapon: '기본 무기는 팔 수 없어요', not_enhanced: '강화(+1 이상)한 무기만 팔 수 있어요', not_owned: '그 무기를 갖고 있지 않아요', too_many: '동시에 등록은 8개까지예요', bad_price: '가격은 $100 ~ $1조 사이로 정해 주세요', bad_qty: '수량을 확인해 주세요', not_enough: '보유 수량이 부족해요', no_profile: '계정이 아직 서버에 없어요 · 잠시 뒤 다시 시도해 주세요', not_found: '이미 사라진 경매예요', gone: '이미 팔렸거나 취소된 경매예요', own_listing: '내가 올린 물건은 살 수 없어요', no_money: '돈이 부족해요', owned: '이미 같은 무기를 갖고 있어요 (덮어써서 잃지 않게 막았어요)', already_owned: '같은 무기를 이미 갖고 있어서 돌려받을 수 없어요 · 그 무기를 먼저 정리해 주세요', seller_gone: '판매자 계정이 없어져서 경매가 취소됐어요', not_yours: '내 경매가 아니에요', not_open: '이미 끝난 경매예요', net: '서버와 연결이 안 돼요 · 잠시 뒤 다시 시도해 주세요', bad_kind: '올릴 수 없는 종류예요' };
+    let auTab = 'buy', auRows = null, auMine = null, auBusy = false, auLoadT = 0, auNote = '', auOk = true;
+    const wNm = i => (WP[i] && WP[i].n) || ('무기 ' + i);
+    function auDesc(a) {
+      if (a.kind === 'weapon') { const e = Array.isArray(a.ench) && ENCH[a.ench[0]]; return `⚔️ ${esc(wNm(a.weapon))} <b style="color:#ffb347">+${a.lv}</b>` + (e ? ` · ${e.ic}${esc(e.n)} Lv${a.ench[1]}` : ''); }
+      const k = AUC_K[a.kind] || ['📦', a.kind]; return `${k[0]} ${esc(k[1])} <b style="color:#7fe7ff">×${(+a.qty).toLocaleString()}</b>`;
+    }
+    function aucOpen() {
+      if (guest) { msg('닉네임 계정이 있어야 경매장을 쓸 수 있어요 · 닉네임 변경부터 해주세요'); addFeed('⚠ 경매장은 닉네임을 정한 계정만 이용할 수 있어요', '#ffd23f'); return; }
+      if (!sb) { msg('서버에 연결 중이에요 · 잠시 뒤 다시 시도해 주세요'); return; }
+      auTab = 'buy'; auNote = ''; openPanel('auc'); aucLoad(true);
+    }
+    async function aucLoad(force) {
+      if (!sb || guest) return; const now = performance.now(); if (!force && now - auLoadT < 1500) return; auLoadT = now;
+      try {
+        const ra = await sb.from('cc_auctions').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(80);
+        if (!ra.error) auRows = ra.data || [];
+        const rb = await sb.from('cc_auctions').select('*').eq('status', 'open').eq('seller', myName).order('created_at', { ascending: false });
+        if (!rb.error) auMine = rb.data || [];
+      } catch (e) {}
+      if (panel === 'auc' && auTab !== 'sell') renderAuc();
+    }
+    setInterval(() => { if (panel === 'auc' && !auBusy && !document.hidden) aucLoad(); }, 4000);
+    function renderAuc() {
+      $('auMoney').textContent = '💰 ' + fmt(money);
+      $('auTabs').innerHTML = [['buy', '🛒 구경 · 구매'], ['sell', '📦 물건 올리기'], ['mine', '📋 내 등록 목록']].map(([k, l]) => `<div class="tb${auTab === k ? ' on' : ''}" data-tab="${k}">${l}</div>`).join('');
+      $('auRes').style.color = auOk ? '#4cd98a' : '#ff8f8f'; $('auRes').textContent = auNote;
+      const bd = $('auBody');
+      if (guest) { bd.innerHTML = '<div style="padding:20px;text-align:center;color:#ffd23f">경매장은 닉네임 계정이 있어야 이용할 수 있어요 · 닉네임 변경부터 해주세요</div>'; return; }
+      if (auTab === 'buy') {
+        if (!auRows) { bd.innerHTML = '<div style="padding:20px;text-align:center;color:#8b95a8">불러오는 중…</div>'; return; }
+        bd.innerHTML = auRows.length ? auRows.map(a => {
+          const mine = a.seller === myName, have = a.kind === 'weapon' && own[a.weapon], no = mine || have || money < a.price;
+          const unit = a.kind !== 'weapon' && a.qty > 1 ? ` · 개당 ${fmt(a.price / a.qty)}` : '';
+          return `<div class="row"><div class="nm">${auDesc(a)}<div class="ds">판매자 ${esc(a.seller)}${unit}</div></div><div class="pr">${fmt(a.price)}</div><div class="btn${no ? ' dis' : ''}" data-buy="${a.id}">${mine ? '내 물건' : have ? '보유 중' : money < a.price ? '돈 부족' : '구매'}</div></div>`;
+        }).join('') : '<div style="padding:24px;text-align:center;color:#8b95a8">올라온 물건이 아직 없어요 · 첫 번째 판매자가 되어 보세요!</div>';
+      } else if (auTab === 'sell') {
+        let h = '<div class="sec">⚔️ 강화한 무기 (기본 무기 권총~저격총은 판매 불가)</div>', any = false;
+        for (let i = 6; i < WP.length; i++) {
+          if (!own[i]) continue; any = true; const lv = (own.wu && own.wu[i]) | 0, e = own.en && own.en[i] && ENCH[own.en[i][0]];
+          const tag = e ? ` · ${e.ic}${esc(e.n)} Lv${own.en[i][1]}` : '';
+          h += lv >= 1
+            ? `<div class="row"><div class="nm">⚔️ ${esc(wNm(i))} <b style="color:#ffb347">+${lv}</b>${tag}</div><div class="aul"><input class="ai" id="auP_w${i}" type="number" min="100" step="1" placeholder="가격 ($)"><div class="btn" data-sellw="${i}">올리기</div></div></div>`
+            : `<div class="row dim"><div class="nm">⚔️ ${esc(wNm(i))}<div class="ds">강화소에서 +1 이상으로 강화해야 팔 수 있어요</div></div></div>`;
+        }
+        if (!any) h += '<div style="padding:10px;color:#8b95a8;font-size:13px">가진 특수 무기가 없어요</div>';
+        h += '<div class="sec">💣 폭발물 · ☢️ 원자폭탄 (여러 개를 한 번에 묶음으로)</div>';
+        for (const k of ['gren', 'tnt', 'ab']) {
+          const have = k === 'ab' ? (own.ab | 0) : k === 'gren' ? gren : tnt, ic = AUC_K[k];
+          h += `<div class="row${have > 0 ? '' : ' dim'}"><div class="nm">${ic[0]} ${esc(ic[1])}<div class="ds">보유 ${have.toLocaleString()}개</div></div><div class="aul"><input class="ai" id="auQ_${k}" type="number" min="1" max="${have}" step="1" value="${have > 0 ? have : ''}" placeholder="수량" style="width:84px"><input class="ai" id="auP_${k}" type="number" min="100" step="1" placeholder="묶음 총 가격 ($)"><div class="btn${have > 0 ? '' : ' dis'}" data-sellb="${k}">올리기</div></div></div>`;
+        }
+        bd.innerHTML = h;
+      } else {
+        if (!auMine) { bd.innerHTML = '<div style="padding:20px;text-align:center;color:#8b95a8">불러오는 중…</div>'; return; }
+        bd.innerHTML = auMine.length ? auMine.map(a => `<div class="row"><div class="nm">${auDesc(a)}</div><div class="pr">${fmt(a.price)}</div><div class="btn o" data-cancel="${a.id}">취소 (돌려받기)</div></div>`).join('') : '<div style="padding:24px;text-align:center;color:#8b95a8">등록한 물건이 없어요</div>';
+      }
+    }
+    aucEl.addEventListener('click', e => {
+      const t = e.target.closest('[data-tab],[data-buy],[data-sellw],[data-sellb],[data-cancel]'); if (!t) return;
+      if (t.dataset.tab) { auTab = t.dataset.tab; auNote = ''; renderAuc(); if (auTab !== 'sell') aucLoad(true); return; }
+      if (t.classList.contains('dis') || auBusy) return;
+      if (t.dataset.buy) aucBuy(+t.dataset.buy);
+      else if (t.dataset.cancel) aucCancel(+t.dataset.cancel);
+      else if (t.dataset.sellw) aucSell('weapon', +t.dataset.sellw);
+      else if (t.dataset.sellb) aucSell(t.dataset.sellb, 0);
+    });
+    for (const ev of ['keydown', 'keyup', 'keypress']) aucEl.addEventListener(ev, e => { if (e.target.tagName !== 'INPUT') return; e.stopPropagation(); if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); e.target.blur(); closePanel(); } });
+    // 서버 함수 호출: 내 최신 상태를 먼저 저장 → 저장 잠금 → 서버가 거래 → 결과를 즉시 받아 반영 (중간에 옛 데이터가 덮어쓰지 않게)
+    async function aucRpc(fn, args) {
+      auBusy = true; auNote = '처리 중…'; auOk = true; if (panel === 'auc') $('auRes').textContent = auNote;
+      let res = { ok: false, err: 'net' };
+      try {
+        own.gren = gren; own.tnt = tnt;
+        for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+        await saveProfile(true); for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+        profBusy = true;
+        try {
+          const { data, error } = await sb.rpc(fn, args); if (!error && data) res = data;
+          const before = admSeq; await admPoll(true);
+          if (res.ok && admSeq === before) await loadProfile();   // 반영이 늦으면 서버 값을 다시 불러와서 덮어쓰기 사고 방지
+        } finally { profBusy = false; }
+      } catch (e) {}
+      auBusy = false; return res;
+    }
+    const auResult = (r, okMsg) => { auOk = !!r.ok; auNote = r.ok ? okMsg : (AUC_ERR[r.err] || '실패했어요') + (r.err === 'no_money' && r.need ? ` (부족 ${fmt(r.need)})` : r.err === 'not_enough' ? ` (보유 ${r.have | 0}개)` : ''); if (r.ok) playSound('cash'); };
+    async function aucSell(kind, w) {
+      const gv = id => { const el = $(id); return el ? Math.floor(Number(el.value)) : NaN; };
+      const price = gv(kind === 'weapon' ? 'auP_w' + w : 'auP_' + kind), qty = kind === 'weapon' ? 1 : gv('auQ_' + kind);
+      const bad = t => { auOk = false; auNote = t; $('auRes').style.color = '#ff8f8f'; $('auRes').textContent = t; };
+      if (!(price >= 100) || !Number.isFinite(price)) { bad('가격을 $100 이상으로 적어 주세요'); return; }
+      if (price > 1e12) { bad('가격은 최대 $1조예요'); return; }
+      if (!(qty >= 1) || !Number.isFinite(qty)) { bad('수량을 1 이상으로 적어 주세요'); return; }
+      const r = await aucRpc('cc_auction_list', { p_seller: myName, p_kind: kind, p_weapon: kind === 'weapon' ? w : null, p_qty: qty, p_price: price });
+      auResult(r, kind === 'weapon' ? `✅ ${wNm(w)} 등록 완료 · ${fmt(price)}` : `✅ ${AUC_K[kind][1]} ×${qty.toLocaleString()} 등록 완료 · ${fmt(price)}`);
+      await aucLoad(true); if (panel === 'auc') renderAuc();
+    }
+    async function aucBuy(id) {
+      const a = (auRows || []).find(x => x.id === id); if (!a) return;
+      const r = await aucRpc('cc_auction_buy', { p_id: id, p_buyer: myName });
+      auResult(r, `✅ 구매 완료! ${a.kind === 'weapon' ? wNm(a.weapon) + ' +' + a.lv : AUC_K[a.kind][1] + ' ×' + a.qty} (-${fmt(a.price)})`);
+      await aucLoad(true); if (panel === 'auc') renderAuc();
+    }
+    async function aucCancel(id) {
+      const r = await aucRpc('cc_auction_cancel', { p_id: id, p_seller: myName });
+      auResult(r, '✅ 등록을 취소하고 물건을 돌려받았어요');
+      await aucLoad(true); if (panel === 'auc') renderAuc();
+    }
+
+    // ---------------------------------------------------------------- v21 🚔 경찰 레이드 (로비 LLLLL 발판 → 방 RI****)
+    const RAID = [
+      { n: '보통', ic: '🟢', waves: 5, base: 3, inc: 2, pol: 6, pi: 1, cap: 12, rw: 1000000 },
+      { n: '어려움', ic: '🟠', waves: 8, base: 5, inc: 3, pol: 8, pi: 1.5, cap: 18, rw: 2500000 },
+      { n: '지옥', ic: '🔴', waves: 12, base: 8, inc: 4, pol: 10, pi: 2, cap: 24, rw: 6000000 }
+    ];
+    const isRaid = c => c.length === 6 && c.startsWith('RI');
+    const raidQuota = (d, w, size) => Math.ceil((RAID[d].base + RAID[d].inc * (w - 1)) * (1 + 0.6 * (size - 1)));
+    let raid = null, pendRaid = null, raidSyncT = 0;
+    function lobPad() { const q = HALLS.L; return { x: q.x, y: q.y - 60, r: 120 }; }
+    const lobBox = document.createElement('div'); lobBox.id = 'lobBox';
+    { const st = document.createElement('style'); st.textContent = `#lobBox{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:62;display:none;width:260px;padding:14px;background:rgba(10,18,32,.93);border:1.5px solid #38e8ff;border-radius:14px;color:#fff;font:13px system-ui;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+      #lobBox b.t{display:block;font-size:17px;color:#7fe7ff;margin-bottom:6px}#lobBox .sec{margin:10px 0 4px;font-weight:800;color:#ffd23f;font-size:12px}
+      #lobBox .o{padding:8px 10px;margin:4px 0;border-radius:9px;background:rgba(255,255,255,.07);border:1.5px solid transparent;cursor:pointer;user-select:none}#lobBox .o.on{border-color:#38e8ff;background:rgba(56,232,255,.16)}#lobBox.mem .o{cursor:default;opacity:.85}
+      #lobBox .sz{display:flex;gap:6px}#lobBox .sz .o{flex:1;text-align:center;margin:0}#lobBox .inf{margin-top:10px;font-weight:800;text-align:center;min-height:36px}`; document.head.appendChild(st); }
+    document.body.appendChild(lobBox);
+    for (const ev of ['mousedown', 'mouseup', 'click', 'touchstart']) lobBox.addEventListener(ev, e => e.stopPropagation());
+    const lobMine = { diff: 0, size: 1 }; let lobCfg = null, lobLead = false, lobGo = null, lobSendT = 0, lobSig = '', lobWas = false;
+    lobBox.addEventListener('click', e => {
+      const t = e.target.closest('[data-d],[data-s]'); if (!t || !lobLead) return;
+      if (t.dataset.d !== undefined) lobMine.diff = +t.dataset.d; if (t.dataset.s !== undefined) lobMine.size = +t.dataset.s;
+      lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, t: performance.now() }; lobSendT = 0; lobSig = '';
+    });
+    function lobOn() {
+      const p = lobPad(), r = p.r - 6, a = [];
+      if (P.onFoot && Math.hypot(P.x - p.x, P.y - p.y) < r) a.push({ id: myId, name: myName });
+      for (const q of remotes.values()) if (q.onFoot && !q.rd && Math.hypot((q.tx === undefined ? q.x : q.tx) - p.x, (q.ty === undefined ? q.y : q.ty) - p.y) < r) a.push({ id: q.id, name: q.name });
+      return a;
+    }
+    function lobRecv(d) {
+      if (hall !== 'L') return;
+      if (d.k === 'cfg') {
+        if (lobLead && d.id < myId) lobLead = false;
+        if (!lobLead) lobCfg = { id: d.id, name: d.name, diff: d.diff | 0, size: Math.max(1, Math.min(4, d.size | 0)), t: performance.now() };
+      } else if (d.k === 'go') {
+        if (lobCfg && d.id === lobCfg.id && isRaid(String(d.code))) lobGo = { code: String(d.code), diff: Math.max(0, Math.min(2, d.diff | 0)), size: Math.max(1, Math.min(4, d.size | 0)), at: performance.now() + 3000 };
+      } else if (d.k === 'abort') { if (lobCfg && d.id === lobCfg.id) lobGo = null; }
+    }
+    function lobNear() { return null; }
+    function lobTick(dt) {
+      const now = performance.now(), on = lobOn(), me = on.some(p => p.id === myId);
+      if (!me) {
+        if (lobLead && lobGo) send('lob', { k: 'abort' });
+        lobLead = false; lobGo = null; lobWas = false; if (lobBox.style.display !== 'none') lobBox.style.display = 'none'; return;
+      }
+      if (!lobWas) { lobWas = true; lobSig = ''; if (document.pointerLockElement) document.exitPointerLock(); }
+      if (!lobCfg || now - lobCfg.t > 4000 || !on.some(p => p.id === lobCfg.id)) { lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, t: now }; lobLead = true; lobSendT = 0; }
+      if (lobLead) { lobCfg.t = now; if (now - lobSendT > 1500) { lobSendT = now; send('lob', { k: 'cfg', diff: lobCfg.diff, size: lobCfg.size }); } }
+      const full = on.length === lobCfg.size;
+      if (lobLead) {
+        if (full && !lobGo) { const code = 'RI' + rc(4); lobGo = { code, diff: lobCfg.diff, size: lobCfg.size, at: now + 3000 }; send('lob', { k: 'go', code, diff: lobCfg.diff, size: lobCfg.size }); }
+        else if (!full && lobGo) { lobGo = null; send('lob', { k: 'abort' }); }
+      }
+      if (lobGo) {
+        if (on.length !== lobGo.size) lobGo = null;
+        else if (now >= lobGo.at) { const g = lobGo; lobGo = null; lobBox.style.display = 'none'; lobWas = false; pendRaid = { code: g.code, diff: g.diff, size: g.size }; go(g.code); return; }
+      }
+      const cd = lobGo ? Math.max(1, Math.ceil((lobGo.at - now) / 1000)) : 0;
+      const sig = [lobCfg.id, lobCfg.diff, lobCfg.size, on.length, cd, lobLead].join('|');
+      if (sig !== lobSig) {
+        lobSig = sig; lobBox.className = lobLead ? '' : 'mem';
+        lobBox.innerHTML = `<b class="t">🚔 경찰 레이드</b><div style="color:#9fb3c8">${lobLead ? '내가 방장 · 난이도와 인원을 정하세요' : '방장 ' + esc(lobCfg.name) + ' 님이 정한 설정이에요'}</div><div class="sec">난이도</div>`
+          + RAID.map((r, i) => `<div class="o${lobCfg.diff === i ? ' on' : ''}" data-d="${i}">${r.ic} <b>${r.n}</b> · ${r.waves}웨이브<br><small style="color:#9fb3c8">보상 ${fmt(r.rw)} · 경찰 ${r.pol}→${Math.min(r.cap, Math.round(r.pol + r.pi * (r.waves - 1)))}대</small></div>`).join('')
+          + `<div class="sec">입장 인원 (정확히 이 인원이 발판 위에 서야 시작)</div><div class="sz">${[1, 2, 3, 4].map(n => `<div class="o${lobCfg.size === n ? ' on' : ''}" data-s="${n}">${n}명</div>`).join('')}</div>`
+          + `<div class="inf" style="color:${cd ? '#ffd23f' : on.length === lobCfg.size ? '#4cd98a' : '#9fb3c8'}">${cd ? `⏱ ${cd}초 뒤 출발!` : `발판 위 ${on.length} / ${lobCfg.size}명` + (on.length > lobCfg.size ? '<br>인원 초과 · 한 명이 내려가요' : '')}</div>`;
+        lobBox.style.display = 'block';
+      }
+    }
+    function raidStart(code) {
+      const pr = pendRaid && pendRaid.code === code ? pendRaid : { diff: 0, size: 1 }; pendRaid = null;
+      raid = { code, diff: pr.diff, size: pr.size, wave: 0, done: 0, quota: 0, ph: 'intro', t: 6 };
+      lobBox.style.display = 'none'; lobGo = null; lobLead = false; lobWas = false;
+      raidClear();
+      let h = 0; for (const c of code) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+      const i = 4 + h % (N - 8), j = 4 + ((h >>> 8) % (N - 8));
+      P.onFoot = true; P.car = null; P.z = 0; P.roof = null; P.climb = 0; P.x = i * B + rnd(-30, 30); P.y = j * B + 40 + rnd(-30, 30);
+      heat = 0; bust = 0;
+      title('🚔 경찰 레이드', `${RAID[raid.diff].ic} ${RAID[raid.diff].n} · ${RAID[raid.diff].waves}웨이브 · 팀 ${raid.size}명 · 6초 뒤 시작`, '#ff5a5a');
+      addFeed(`🚔 레이드 시작! ${RAID[raid.diff].n} (${RAID[raid.diff].waves}웨이브) · 체포되면 탈락이에요`, '#ff8a5a');
+    }
+    function raidClear() { for (let i = cars.length - 1; i >= 0; i--) if (cars[i].type === 'c') cars.splice(i, 1); for (const o of offs) sc.remove(o.m); offs.length = 0; }
+    function raidStop() { raid = null; raidClear(); heat = 0; bust = 0; martial = false; }
+    function raidWant() { const r = RAID[raid.diff]; return raid.ph === 'run' || raid.ph === 'brk' ? Math.min(r.cap, Math.round(r.pol + r.pi * (Math.max(1, raid.wave) - 1))) : 0; }
+    function raidNext() {
+      raid.wave++; const r = RAID[raid.diff];
+      if (raid.wave > r.waves) { raidWin(); return; }
+      raid.done = 0; raid.quota = raidQuota(raid.diff, raid.wave, raid.size); raid.ph = 'run'; heat = 5; if (!martial) { martial = true; showMartial(); }
+      title(`🚨 WAVE ${raid.wave} / ${r.waves}`, `도둑질 ${raid.quota}번 성공하라! (은행·ATM·상점 아무 데나)`, '#ff5a5a'); playSound('siren');
+      for (let n = 0; n < 3; n++) spawnPolice();
+    }
+    function raidWin() {
+      const r = RAID[raid.diff]; raid.ph = 'win'; raid.t = 8; money += r.rw; playSound('cash');
+      title('🏆 레이드 클리어!', `${r.n} 난이도 완료 · 보상 +${fmt(r.rw)}`, '#ffd23f'); addFeed(`🏆 레이드(${r.n}) 클리어! +${fmt(r.rw)}`, '#ffd23f'); event(`님이 경찰 레이드(${r.n})를 클리어했습니다! 🏆`);
+      raidClear(); heat = 0; martial = false;
+    }
+    function raidTick(dt) {
+      if (!raid) return;
+      if (raid.ph === 'intro') { heat = 0; raid.t -= dt; if (raid.t <= 0) raidNext(); }
+      else if (raid.ph === 'run') {
+        heat = 5; if (!martial) { martial = true; showMartial(); }
+        if (raid.done >= raid.quota) { raid.ph = 'brk'; raid.t = 7; title(`✅ WAVE ${raid.wave} 클리어`, '7초 뒤 다음 웨이브 · 경찰은 계속 쫓아와요!', '#7bd44a'); playSound('cash'); }
+      } else if (raid.ph === 'brk') { heat = 5; raid.t -= dt; if (raid.t <= 0) raidNext(); }
+      else if (raid.ph === 'win') { raid.t -= dt; if (raid.t <= 0) { go(LOBBY); return; } }
+      raidSyncT -= dt; if (raidSyncT <= 0 && joined() && (remotes.size === 0 || hostId() === myId)) { raidSyncT = 2; send('rst', { w: raid.wave, dn: raid.done, ph: raid.ph, t: Math.round(raid.t * 10) / 10 }); }
+    }
+    const PHN = { intro: 0, run: 1, brk: 2, win: 3 };
+    function raidRecvState(d) {
+      if (!raid || raid.ph === 'win') return;
+      const w = d.w | 0; if (w < raid.wave) return;
+      if (w > raid.wave || (w === raid.wave && ((d.dn | 0) > raid.done || (PHN[d.ph] || 0) > PHN[raid.ph]))) {
+        raid.wave = w; raid.done = d.dn | 0; raid.ph = PHN[d.ph] !== undefined ? d.ph : raid.ph; raid.t = +d.t || 0; raid.quota = w ? raidQuota(raid.diff, w, raid.size) : 0;
+        if (raid.ph === 'win') { raidWin(); }
+      }
+    }
+    function raidRecvRob(d) { if (raid && raid.ph === 'run') raid.done = Math.min(raid.quota, raid.done + Math.max(1, Math.min(3, d.w | 0))); }
+    function raidRob(w) { if (!raid || raid.ph !== 'run') return; raid.done = Math.min(raid.quota, raid.done + w); send('rrob', { w }); msg(`🚨 도둑질 ${raid.done} / ${raid.quota}`); }
+    function raidBusted() {
+      title('🚔 체포! 레이드 탈락', '로비로 돌아가요 (벌금은 없어요)', '#7fb6ff'); bust = 0; tased = 0;
+      raidStop(); go(LOBBY);
+    }
+    function raidHud() {
+      const r = RAID[raid.diff], x = VW / 2; ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+      ctx.fillStyle = '#ff5a5a'; ctx.font = 'bold 15px system-ui';
+      const head = raid.ph === 'intro' ? `🚔 RAID ${r.n} · ${Math.ceil(raid.t)}초 뒤 시작` : raid.ph === 'win' ? '🏆 레이드 클리어!' : `🚔 RAID ${r.n} · WAVE ${raid.wave} / ${r.waves}`;
+      ctx.fillText(head, x, 30);
+      if (raid.ph === 'run' || raid.ph === 'brk') {
+        const w = 240, p = raid.quota ? Math.min(1, raid.done / raid.quota) : 0;
+        ctx.fillStyle = '#0009'; ctx.fillRect(x - w / 2, 52, w, 14); ctx.fillStyle = raid.ph === 'brk' ? '#4cd98a' : '#ffd23f'; ctx.fillRect(x - w / 2, 52, w * p, 14);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(raid.ph === 'brk' ? `웨이브 클리어! 다음까지 ${Math.ceil(raid.t)}초` : `도둑질 ${raid.done} / ${raid.quota}`, x, 69);
+      }
+      ctx.restore();
+    }
+
     // ---------------------------------------------------------------- ☢️ 박수치기 가이아나 원자폭탄 (1억)
     let abBusy = false, abCaught = null;
     (() => { const st = document.createElement('style'); st.textContent = `
@@ -4062,6 +4519,7 @@
     const abOv = document.createElement('div'); abOv.id = 'abov'; abOv.innerHTML = '<div class="cl"><span>👏</span><span>👏</span></div><div class="tx"></div>'; document.body.appendChild(abOv);
     const abFl = document.createElement('div'); abFl.id = 'abfl'; document.body.appendChild(abFl);
     function abPlace() {
+      if (hall || raid) { msg('☢️ 여기서는 설치할 수 없어요'); return; }
       if (!own.ab) { msg(`☢️ ${ABN}이(가) 없어요 (상점에서 선착순 한정 판매)`); return; }
       if (abBusy) { msg('☢️ 이미 발동 중이에요'); return; }
       if (!P.onFoot || P.climb) { msg('걸어서 땅에 서 있을 때 설치할 수 있어요'); return; }
@@ -4104,7 +4562,8 @@
 
     // ---------------------------------------------------------------- 건물 상호작용 · 매 프레임
     function station() {
-      if (panel === 'deal' || panel === 'enh') { closePanel(); return true; }
+      if (panel === 'deal' || panel === 'enh' || panel === 'auc') { closePanel(); return true; }
+      if (hall) return hallE();
       if (activeInterior || P.roof || P.z > 8) return false;
       for (const st of stations) if (Math.hypot(P.x - st.x, P.y - st.y) < st.r) { if (st.k === 'deal') { dealHl = null; openPanel('deal'); } else openPanel('enh'); return true; }
       const dc2 = cars.find(c => c.disp && Math.hypot(c.x - P.x, c.y - P.y) < 48);
@@ -4112,12 +4571,16 @@
       return false;
     }
     function v4Tick(dt) {
+      if (own.gren !== gren) own.gren = gren; if (own.tnt !== tnt) own.tnt = tnt;
       if (isArena()) arenaTick(dt);
+      if (hall) hallTick(dt);
+      if (raid) raidTick(dt);
       abTick(dt);
       if (!pvpOn()) { php = 100; pvShield = 0; hurtT = 0; } else { if (pvShield > 0) pvShield -= dt; if (hurtT > 0) hurtT -= dt; if (php < 100 && performance.now() - phT > 6000) php = Math.min(100, php + 8 * dt); }
-      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money); else if (panel === 'atm') renderAtm(false); }
+      if (panel) { mdown = false; if (panel === 'deal') $('dlMoney').textContent = '💰 ' + fmt(money); else if (panel === 'enh') $('enMoney').textContent = '💰 ' + fmt(money); else if (panel === 'atm') renderAtm(false); else if (panel === 'auc') $('auMoney').textContent = '💰 ' + fmt(money); }
       stNear = null;
-      if (P.onFoot && !activeInterior && !P.roof && P.z < 8) {
+      if (hall) { if (P.onFoot) stNear = hallNear(); }
+      else if (P.onFoot && !activeInterior && !P.roof && P.z < 8) {
         for (const st of stations) if (Math.hypot(P.x - st.x, P.y - st.y) < st.r) { stNear = st.k === 'deal' ? '🚗 차 가게 열기' : '⚒ 무기 강화소 열기'; break; }
         if (!stNear && cars.some(c => c.disp && Math.hypot(c.x - P.x, c.y - P.y) < 48)) stNear = '🚗 이 차 구경 / 구매';
       }
@@ -4148,6 +4611,8 @@
         if (gases.some(g => Math.hypot(g.x - c.x, g.y - c.y) < 100)) { ctx.textAlign = 'center'; ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#ffd23f'; ctx.fillText(f >= 99 ? '⛽ 연료 가득' : '[F] 주유  $500', VW / 2, VH / 2 + 80); }
       }
       if (P.onFoot && stNear) { ctx.textAlign = 'center'; ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#fff'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText('[E] ' + stNear, VW / 2, VH / 2 + 80); }
+      if (raid) raidHud();
+      if (lobGo && hall === 'L') { ctx.textAlign = 'center'; ctx.font = 'bold 54px system-ui'; ctx.fillStyle = '#ffd23f'; ctx.shadowColor = '#000'; ctx.shadowBlur = 8; ctx.fillText(String(Math.max(1, Math.ceil((lobGo.at - performance.now()) / 1000))), VW / 2, VH / 2 - 120); }
       ctx.restore(); drawGuideHud();
     }
     window.addEventListener('keydown', e => {
@@ -4169,7 +4634,7 @@
     refreshUI();
     setTimeout(() => go(myCode), 300);
     setInterval(() => { if (lastD && performance.now() - lastForce > 2500) { lastForce = performance.now(); send('s', lastD); } }, 2500);
-    return { tick, hud, mini, wlv, station, shot, abHole: (x, y) => wellAdd(x, y, 60, 1), nitro: () => nitroT > 0, has: k => !!own[k], pvpOn, pvpCone, pvpRad, pvpRay, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1), phys, pS: pSolid, jump: doJump };
+    return { tick, hud, mini, wlv, station, shot, hall: () => hall, raid: () => !!raid, raidWant, raidRob, raidBusted, abHole: (x, y) => wellAdd(x, y, 60, 1), nitro: () => nitroT > 0, has: k => !!own[k], pvpOn, pvpCone, pvpRad, pvpRay, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1) * swiftMul(), fx: fxShot, enHit, relMul, enTag, phys, pS: pSolid, jump: doJump };
   })();
 
   let last = performance.now();
