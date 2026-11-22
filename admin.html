@@ -74,10 +74,10 @@
     <div class="card"><div class="lbl">➕ 관리자가 직접 경매에 올리기 (판매자 [관리자] · 팔려도 대금은 지급되지 않아요)</div>
       <div class="row" style="margin-top:8px">
         <select id="nkKind" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option value="weapon">⚔️ 무기</option><option value="gren">💣 수류탄</option><option value="tnt">🧨 TNT</option><option value="ab">☢️ 원자폭탄</option></select>
-        <select id="nkW" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select>
+        <span id="nkWb" class="row" style="gap:8px"><select id="nkW" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select>
         <input id="nkLv" type="number" min="1" max="99" value="10" style="width:80px" title="강화 단계">
         <select id="nkEn" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select>
-        <select id="nkEl" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option>1</option><option>2</option><option>3</option></select>
+        <select id="nkEl" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option>1</option><option>2</option><option>3</option></select></span>
         <input id="nkQ" type="number" min="1" value="10" style="width:90px" title="수량">
         <input id="nkP" type="number" min="0" placeholder="가격 ($)" style="width:140px">
         <button class="pri" id="nkGo">경매에 올리기</button>
@@ -252,7 +252,7 @@ $('zeroGo').onclick = () => { if (confirm('원자폭탄을 품절(0개) 처리�
 $('priceGo').onclick = () => { const n = intOf($('priceN')); if (!(n >= 0)) return toast('0 이상의 가격을 입력하세요', 0); const g = cur.stock.ab; stockCall('cc_admin_set_stock', { p_stock: g ? g.stock : 0, p_price: n }, `판매 가격을 ${fmt(n)}로 바꿨어요`).then(() => $('priceN').value = ''); };
 
 // ---- 계정 (기존 cc_admin_list / get / set / rename / delete 함수 사용)
-const WEAPONS = [[6, '미니건'], [7, '⚡ 레일건'], [8, '멀티 로켓런처'], [9, '🌋 화염방사기'], [10, '플라즈마 라이플'], [11, '유탄발사기'], [12, '석궁'], [13, '레이저 소총'], [14, '🌩️ 번개총'], [15, '🪚 회전톱'], [16, '🕳️ 블랙홀 건'], [17, '네이팜탄'], [18, '🌀 텔레포트 건'], [19, '💣 끈끈이 폭탄총'], [20, '👑 천벌']];
+const WEAPONS = [[7, '⚡ 레일건'], [9, '🌋 화염방사기'], [14, '🌩️ 번개총'], [15, '🪚 회전톱'], [16, '🕳️ 블랙홀 건'], [18, '🌀 텔레포트 건'], [19, '💣 끈끈이 폭탄총'], [20, '👑 천벌']];
 const ENCHN = ['🔥 화염', '⚡ 뇌전', '💥 폭렬', '🏹 관통', '💰 약탈', '👻 은밀', '❄️ 빙결', '🎯 급소', '🔋 절약', '⏩ 속사', '🌟 분열', '🕳️ 인력', '💨 질주', '☠️ 처형', '🔄 속장전'];
 const KINDN = { gren: '💣 수류탄', tnt: '🧨 TNT', ab: '☢️ 원자폭탄' };
 const PERMS = [['jp', '🎒 제트팩'], ['gh', '🪝 그래플링 훅'], ['chute', '🪂 낙하산'], ['vest', '🦺 방탄조끼'], ['bag', '💼 현금 가방'], ['pvp', '⚔️ PvP 모드']];
@@ -441,6 +441,8 @@ $('auSt').onchange = loadAuc; $('auReload').onclick = loadAuc;
 setInterval(() => { if (pw && curTab === 5 && !document.hidden && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#auRows'))) loadAuc(); }, 3000);
 $('nkW').innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('');
 $('nkEn').innerHTML = '<option value="-1">인첸트 없음</option>' + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+const nkSync = () => { const w = $('nkKind').value === 'weapon'; $('nkWb').classList.toggle('hide', !w); $('nkLv').classList.toggle('hide', !w); $('nkQ').classList.toggle('hide', w); };
+$('nkKind').onchange = nkSync; nkSync();
 $('nkGo').onclick = async () => {
   const kind = $('nkKind').value, price = Math.floor(Number($('nkP').value)); if (!(price >= 0)) return toast('가격을 입력하세요', 0);
   const et = Number($('nkEn').value), ench = kind === 'weapon' && et >= 0 ? [et, Number($('nkEl').value)] : null;
