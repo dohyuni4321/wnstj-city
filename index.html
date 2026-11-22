@@ -3523,6 +3523,7 @@
     }
     async function pingOnce() {
       if (!sb || banned || devOpen) return;
+      capperPing('Crime City');
       try {
         const { data } = await sb.rpc('cc_ping', { p_id: myId, p_name: myName, p_room: room || '', p_money: Math.max(0, Math.round(money)), p_info: raid ? '레이드 W' + raid.wave : hall === 'U' ? '경매장' : hall === 'L' ? '로비' : guest ? '게스트' : '' });
         if (!data || !data.ok) return;
@@ -3532,6 +3533,18 @@
         if ((data.cmd_seq | 0) > pgSeq) { pgSeq = data.cmd_seq | 0; adminCmd(data.cmd); }
       } catch (e) {}
     }
+    // Capper(같은 사이트의 채팅)에 로그인돼 있으면 상태를 "🎮 Crime City 접속중"으로 (Discord처럼)
+    const capperUser = () => { try { return localStorage.getItem('capper_current_user') || ''; } catch (e) { return ''; } };
+    let cpT = 0;
+    function capperPing(game, force) {
+      const u = capperUser(); if (!u || !sb || banned) return;
+      const n = Date.now(); if (!force && n - cpT < 30000) return; cpT = n;
+      try { sb.rpc('capper_playing', { p_user: u, p_game: game }).then(() => {}, () => {}); } catch (e) {}
+    }
+    window.addEventListener('pagehide', () => {   // 탭을 닫으면 바로 해제 (실패해도 110초 뒤 자동으로 꺼져요)
+      const u = capperUser(); if (!u) return;
+      try { fetch(SB_URL + '/rest/v1/rpc/capper_playing', { method: 'POST', keepalive: true, headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_user: u, p_game: '' }) }); } catch (e) {}
+    });
     setInterval(pingOnce, 4000); setTimeout(pingOnce, 1500);
     window.addEventListener('keydown', e => {
       const k = (e.key || '').toLowerCase();
