@@ -432,11 +432,12 @@
     { off: 1, n: '레이저 소총', mag: 80, cd: 0.05, dmg: 16, pel: 1, sp: 0.005, rel: 2.2, v: 2200, life: 0.7, h: 0.08, k: 0.6, col: 0xff2e5a, sz: 1.1, len: 2.8, pr: 99, spin: 1.5, rampN: 10, tip: '전부 관통 · 쏠수록 빨라짐' },
     { n: '번개총', mag: 14, cd: 0.38, dmg: 40, pel: 1, sp: 0, rel: 1.8, v: 1600, life: 0.6, h: 0.2, k: 1.5, col: 0x7ad7ff, sz: 1.4, len: 2.4, chain: 1, tip: '맞으면 주변 3명에게 번개가 튐' },
     { n: '회전톱', mag: 10, cd: 0.5, dmg: 45, pel: 1, sp: 0, rel: 1.6, v: 650, life: 1.8, h: 0.1, k: 1, col: 0xd0d6dd, sz: 2.2, len: 1.6, bmr: 1, pr: 999, tip: '날아갔다가 돌아오며 두 번 벰 · 관통' },
-    { n: '블랙홀 건', mag: 3, cd: 1.2, dmg: 0, pel: 1, sp: 0, rel: 3, v: 360, life: 1.2, h: 0.6, k: 3, col: 0x8a3cff, sz: 3, len: 2.4, hole: 1, tip: '3초간 차·경찰·시민을 빨아들이고 폭발' },
+    { n: '블랙홀 건', mag: 2, cd: 2, dmg: 0, pel: 1, sp: 0, rel: 4.5, v: 360, life: 1.2, h: 0.6, k: 3, col: 0x8a3cff, sz: 3, len: 2.4, hole: 1, tip: '2초간 가까운 차·경찰·시민을 약하게 빨아들이고 작게 폭발 (2발)' },
     { off: 1, n: '네이팜탄', mag: 5, cd: 0.8, dmg: 30, pel: 1, sp: 0.02, rel: 2.4, v: 520, life: 1.3, h: 0.5, k: 3, col: 0xff8a2a, sz: 2, len: 2.2, nap: 1, tip: '떨어진 곳이 6초간 불바다 · 건물에 불이 붙음' },
     { n: '텔레포트 건', mag: 6, cd: 0.6, dmg: 0, pel: 1, sp: 0, rel: 1.8, v: 1400, life: 0.5, h: 0, k: 0.5, col: 0x3dffe0, sz: 1.6, len: 2, tp: 1, q: 1, tip: '탄이 닿은 곳으로 순간이동' },
     { n: '끈끈이 폭탄총', mag: 6, cd: 0.55, dmg: 0, pel: 1, sp: 0, rel: 2, v: 900, life: 1, h: 0.3, k: 2, col: 0xff3355, sz: 2, len: 2, stk: 1, tip: '차에 붙으면 2.5초 뒤 쾅 · 벽·바닥에도 붙음' },
-    { n: '천벌', mag: 3, cd: 1.5, dmg: 0, pel: 1, sp: 0, rel: 4, v: 2400, life: 1.6, h: 0.5, k: 6, col: 0xffd23f, sz: 3, len: 4, orb: 1, leg: 1, tip: '👑 레전드 · 맞춘 곳에 궤도 포격! 1.4초 뒤 십자 5연속 대폭발' }
+    { n: '천벌', mag: 3, cd: 1.5, dmg: 0, pel: 1, sp: 0, rel: 4, v: 2400, life: 1.6, h: 0.5, k: 6, col: 0xffd23f, sz: 3, len: 4, orb: 1, leg: 1, tip: '👑 레전드 · 맞춘 곳에 궤도 포격! 1.4초 뒤 십자 5연속 대폭발' },
+    { n: '유성포', mag: 5, cd: 1.1, dmg: 0, pel: 1, sp: 0, rel: 3.2, v: 2200, life: 1.5, h: 0.5, k: 5, col: 0xff8a3c, sz: 2.6, len: 3.4, orb: 1, lite: 1, leg: 1, tip: '☄️ 레전드(보급형) · 맞춘 곳에 1초 뒤 유성 3발 낙하 · 천벌보다 약하고 싸요' }
   ], am = WP.map(w => w.mag);
 
   // ---------------------------------------------------------------- v21: 강화 99단계 곡선 · 인첸트 15종
@@ -1611,26 +1612,27 @@
     z = z || 14;
     const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 12), new THREE.MeshBasicMaterial({ color: 0x14001f }));
     const rg = new THREE.Mesh(new THREE.TorusGeometry(1, 0.1, 8, 28), new THREE.MeshBasicMaterial({ color: 0xa65cff, transparent: true, opacity: 0.85 }));
-    m.position.set(x, z, y); rg.position.set(x, z, y); sc.add(m); sc.add(rg); wells.push({ x, y, z, t: long ? 30 : 3, T0: long ? 30 : 3, long, m, rg }); playSound('boom'); msg('🕳️ 블랙홀 생성!');
+    m.position.set(x, z, y); rg.position.set(x, z, y); sc.add(m); sc.add(rg); wells.push({ x, y, z, t: long ? 30 : 2, T0: long ? 30 : 2, long, m, rg }); playSound('boom'); msg('🕳️ 블랙홀 생성!');
   }
   function wellUpd(dt) {
     for (let i = wells.length - 1; i >= 0; i--) {
       const w = wells[i]; w.t -= dt; const k = Math.min(1, (w.T0 - w.t) / 0.4), zm = w.long ? 2.4 : 1;
-      w.m.scale.setScalar(14 * zm * k * (1 + Math.sin(T * 14) * 0.08)); w.rg.rotation.set(Math.PI / 2, 0, T * 5); w.rg.scale.setScalar((42 * k + Math.sin(T * 9) * 3) * zm);
+      const WR = w.long ? 320 : 210, WS = w.long ? 1 : 0.5, WD = w.long ? 1 : 0.5;   // 일반 블랙홀(블랙홀 건·인력)은 약하게, 원자폭탄의 장기 블랙홀은 그대로
+      w.m.scale.setScalar((w.long ? 14 : 10) * zm * k * (1 + Math.sin(T * 14) * 0.08)); w.rg.rotation.set(Math.PI / 2, 0, T * 5); w.rg.scale.setScalar(((w.long ? 42 : 30) * k + Math.sin(T * 9) * 3) * zm);
       for (const c of cars) {
         if (c === P.car || c.disp || c.type === 'p') continue;
-        const dx = w.x - c.x, dy = w.y - c.y, d = Math.hypot(dx, dy); if (d > 320 || d < 1) continue;
-        const mv = (90 + 300 * (1 - d / 320)) * dt, nx = c.x + dx / d * mv, ny = c.y + dy / d * mv;
-        if (!solid(nx, c.y, 21)) c.x = nx; if (!solid(c.x, ny, 21)) c.y = ny; c.v *= 0.97; if (d < 45) dmgCar(c, 70 * dt);
+        const dx = w.x - c.x, dy = w.y - c.y, d = Math.hypot(dx, dy); if (d > WR || d < 1) continue;
+        const mv = (90 + 300 * (1 - d / WR)) * WS * dt, nx = c.x + dx / d * mv, ny = c.y + dy / d * mv;
+        if (!solid(nx, c.y, 21)) c.x = nx; if (!solid(c.x, ny, 21)) c.y = ny; c.v *= 0.97; if (d < 45) dmgCar(c, 70 * WD * dt);
       }
       for (let j = offs.length - 1; j >= 0; j--) {
-        const o = offs[j]; if (o.dead > 0) continue; const dx = w.x - o.x, dy = w.y - o.y, d = Math.hypot(dx, dy); if (d > 320 || d < 1) continue;
-        const mv = (70 + 260 * (1 - d / 320)) * dt, nx = o.x + dx / d * mv, ny = o.y + dy / d * mv;
-        if (!solid(nx, o.y, 6)) o.x = nx; if (!solid(o.x, ny, 6)) o.y = ny; if (d < 40) { o.hp -= 80 * dt; if (o.hp <= 0) killOff(j); }
+        const o = offs[j]; if (o.dead > 0) continue; const dx = w.x - o.x, dy = w.y - o.y, d = Math.hypot(dx, dy); if (d > WR || d < 1) continue;
+        const mv = (70 + 260 * (1 - d / WR)) * WS * dt, nx = o.x + dx / d * mv, ny = o.y + dy / d * mv;
+        if (!solid(nx, o.y, 6)) o.x = nx; if (!solid(o.x, ny, 6)) o.y = ny; if (d < 40) { o.hp -= 80 * WD * dt; if (o.hp <= 0) killOff(j); }
       }
-      for (const p of peds) { if (p.dead > 0) continue; const u = pp(p); if (Math.hypot(u[0] - w.x, u[1] - w.y) < 60) { p.wT = (p.wT || 0) + dt; if (p.wT > 0.25) { p.wT = 0; hitPed(p, true); } } }
-      MP.pvpCone((x, y, r) => Math.hypot(x - w.x, y - w.y) < 70 + r, dt, 0);
-      if (w.t <= 0) { sc.remove(w.m); sc.remove(w.rg); wells.splice(i, 1); if (!w.long) boom(w.x, w.y, 80, 70); }
+      for (const p of peds) { if (p.dead > 0) continue; const u = pp(p); if (Math.hypot(u[0] - w.x, u[1] - w.y) < (w.long ? 60 : 42)) { p.wT = (p.wT || 0) + dt; if (p.wT > 0.25) { p.wT = 0; hitPed(p, true); } } }
+      MP.pvpCone((x, y, r) => Math.hypot(x - w.x, y - w.y) < (w.long ? 70 : 50) + r, dt, 0);
+      if (w.t <= 0) { sc.remove(w.m); sc.remove(w.rg); wells.splice(i, 1); if (!w.long) boom(w.x, w.y, 55, 35); }
     }
   }
   const stks = [];
@@ -1650,18 +1652,19 @@
     }
   }
   const orbs = [];
-  function orbAdd(x, y) {
+  function orbAdd(x, y, lite) {
     const rg = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 36), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.9 }));
     rg.position.set(x, 3, y); rg.rotation.x = Math.PI / 2; sc.add(rg);
     const bm = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 900, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
-    bm.position.set(x, 450, y); sc.add(bm); orbs.push({ x, y, t: 1.4, rg, bm }); playSound('siren'); msg('👑 궤도 포격 조준 완료! 1.4초 뒤 도착');
+    bm.position.set(x, 450, y); sc.add(bm); const T0 = lite ? 1 : 1.4; orbs.push({ x, y, t: T0, T0, lite, rg, bm }); playSound('siren'); msg(lite ? '☄️ 유성 조준 완료! 1초 뒤 낙하' : '👑 궤도 포격 조준 완료! 1.4초 뒤 도착');
   }
   function orbUpd(dt) {
     for (let i = orbs.length - 1; i >= 0; i--) {
-      const o = orbs[i]; o.t -= dt; o.rg.scale.setScalar(150 - 60 * (1 - o.t / 1.4) + Math.sin(T * 30) * 4); o.bm.material.opacity = 0.25 + 0.3 * Math.abs(Math.sin(T * 20));
+      const o = orbs[i]; o.t -= dt; o.rg.scale.setScalar((o.lite ? 120 : 150) - 60 * (1 - o.t / o.T0) + Math.sin(T * 30) * 4); o.bm.material.opacity = 0.25 + 0.3 * Math.abs(Math.sin(T * 20));
       if (o.t <= 0) {
         sc.remove(o.rg); sc.remove(o.bm); orbs.splice(i, 1); shake = Math.max(shake, 14);
-        for (const [ox, oy] of [[0, 0], [110, 0], [-110, 0], [0, 110], [0, -110]]) boom(o.x + ox, o.y + oy, 130, 320);
+        if (o.lite) { for (const [ox, oy] of [[0, 0], [100, 0], [-100, 0]]) boom(o.x + ox, o.y + oy, 105, 190); }
+        else for (const [ox, oy] of [[0, 0], [110, 0], [-110, 0], [0, 110], [0, -110]]) boom(o.x + ox, o.y + oy, 130, 320);
       }
     }
   }
@@ -2124,7 +2127,7 @@
         }
       }
       if (!dead && MP.bulletHit(b)) dead = true;
-      if (dead) { const wd = WP[b.w]; if (wd.hole) { let hx = b.x, hy = b.y; if (solid(hx, hy, 0)) { hx -= b.dx * 20; hy -= b.dy * 20; } wellAdd(hx, hy, Math.max(14, b.z)); } if (wd.nap) napAdd(b.x, b.y); if (wd.tp) tpShot(b); if (wd.stk) stkAdd(b); if (wd.orb) orbAdd(b.x, b.y); }
+      if (dead) { const wd = WP[b.w]; if (wd.hole) { let hx = b.x, hy = b.y; if (solid(hx, hy, 0)) { hx -= b.dx * 20; hy -= b.dy * 20; } wellAdd(hx, hy, Math.max(14, b.z)); } if (wd.nap) napAdd(b.x, b.y); if (wd.tp) tpShot(b); if (wd.stk) stkAdd(b); if (wd.orb) orbAdd(b.x, b.y, wd.lite); }
       if (dead && WP[b.w].ember) napAdd(b.x, b.y, 3);
       if (dead && WP[b.w].rk) { boom(b.x, b.y, b.w === 11 ? 80 : 95, b.w === 11 ? 85 : 100); if (WP[b.w].clu) for (let k = 0; k < 3; k++) { const aa = k * 2.094 + Math.random(); boom(b.x + Math.cos(aa) * 55, b.y + Math.sin(aa) * 55, 55, 60); } }
       if (b.stl < 1 && heat > h0) heat = h0 + (heat - h0) * b.stl;   // 은밀 인첸트: 이 탄이 올린 수배만 줄임
@@ -3251,6 +3254,7 @@
     // v20: 관리자 가격 덮어쓰기(PRICES) · 글로벌 한정 재고(GS) — Supabase cc_prices / cc_global_stock
     const PRICES = {}, GS = { stock: {}, ok: false };
     const ITEMS = [
+      { id: 'leg2', ic: '☄️', n: '유성포 (레전드 보급형)', d: '5발 · 맞춘 곳에 1초 뒤 유성 3발 낙하 (천벌보다 약함)', p: 80000000, w: 21, gold: 1 },
       { id: 'leg', ic: '👑', n: '천벌 (레전드)', d: '3발 · 맞춘 곳에 궤도 포격 · 십자 5연속 대폭발', p: 300000000, w: 20, gold: 1 },
       { id: 'ab', ic: '☢️', gs: 1, get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, get d() { const g = GS.stock.ab; return '전 서버·모든 방 공용 한정 재고 · 선착순 (' + (!GS.ok ? '재고 확인 중…' : g && g.stock > 0 ? '남은 ' + g.stock + '개' : '품절 · 관리자가 재고를 넣으면 구매 가능') + ') · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 켠 사람·안 켠 사람 모두 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요 (무적 포션 중이면 피해 없음)'; }, get p() { const g = GS.stock.ab; return g ? g.price : 100000000; } },
       { id: 'rail', ic: '⚡', n: '레일건', d: '한 방 350 데미지 · 초고속 탄', p: 45000, w: 7 },
@@ -3269,7 +3273,7 @@
       { id: 'clr', ic: '🕶️', n: '수배 지우기', d: '수배 별 전부 제거', p: 5000 },
       { id: 'arc', ic: '🌩️', n: '번개총', d: '14발 · 맞으면 주변 3명에게 연쇄 번개', p: 120000, w: 14 },
       { id: 'saw', ic: '🪚', n: '회전톱', d: '10발 · 날아갔다 돌아오며 관통', p: 95000, w: 15 },
-      { id: 'hole', ic: '🕳️', n: '블랙홀 건', d: '3발 · 차·경찰·시민을 빨아들이는 블랙홀', p: 350000, w: 16 },
+      { id: 'hole', ic: '🕳️', n: '블랙홀 건', d: '2발 · 2초간 가까운 적을 빨아들이는 작은 블랙홀', p: 350000, w: 16 },
       { id: 'stk', ic: '💣', n: '끈끈이 폭탄총', d: '6발 · 차·벽·바닥에 붙으면 2.5초 뒤 폭발', p: 110000, w: 19 },
       { id: 'tele', ic: '🌀', n: '텔레포트 건', d: '6발 · 탄이 닿은 곳으로 순간이동', p: 180000, w: 18 },
       { id: 'pvp', ic: '⚔️', get n() { return 'PvP 모드' + (own.pvp ? (own.pvpOn ? ' · 켜짐' : ' · 꺼짐') : ''); }, get d() { return own.pvp ? '클릭하면 켜기/끄기 · 켠 사람끼리만 서로 데미지 · 죽으면 돈 10%를 처치한 사람이 가져가요' : 'PvP를 켠 사람끼리만 서로 공격 · 상점에서 언제든 켜고 끌 수 있어요'; }, p: 500000, perm: 'pvp', tg: () => own.pvpOn ? 'ON' : 'OFF' },
