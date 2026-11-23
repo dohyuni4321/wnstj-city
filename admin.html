@@ -149,6 +149,16 @@
         <div><div class="lbl">☢️ 원자폭탄 개수</div><input id="aAb" type="number" min="0" step="1" style="width:100%"></div>
         <div><div class="lbl">⛽ 제트팩 연료 업그레이드 Lv(0~5)</div><input id="aJpu" type="number" min="0" max="5" step="1" style="width:100%"></div>
       </div>
+      <div class="lbl" style="margin-top:12px">🧪 물약 보유 개수 (인벤토리 · 유저가 I 키에서 마셔요)</div>
+      <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
+        <div><div class="lbl">🛡️ 무적</div><input class="aPot" data-k="god" type="number" min="0" step="1" style="width:100%"></div>
+        <div><div class="lbl">💨 스피드</div><input class="aPot" data-k="spd" type="number" min="0" step="1" style="width:100%"></div>
+        <div><div class="lbl">🦘 슈퍼점프</div><input class="aPot" data-k="jmp" type="number" min="0" step="1" style="width:100%"></div>
+      </div>
+      <div class="lbl" style="margin-top:12px">🎒 인벤토리 (보관 중인 무기 · 최대 80칸) <span id="aInvN"></span></div>
+      <div id="aInv" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="lbl" style="margin-top:8px">➕ 인벤토리에 무기 넣기 (무기 / 강화 / 인첸트 최대 4개 · 같은 인첸트 중복 가능)</div>
+      <div id="aInvAdd" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"></div>
       <div class="lbl" style="margin-top:12px">전체 데이터(JSON) — 위에 없는 값(웨이포인트 등)도 여기서 직접 고칠 수 있어요</div>
       <textarea id="aJson" rows="6" spellcheck="false"></textarea>
       <div class="row" style="margin-top:10px"><button id="aApply">JSON 적용</button><button class="pri" id="aSave">저장</button><button id="aDel" class="bad" style="margin-left:auto">계정 삭제</button></div>
@@ -260,7 +270,7 @@ const KINDN = { gren: '💣 수류탄', tnt: '🧨 TNT', ab: '☢️ 원자폭�
 const PERMS = [['jp', '🎒 제트팩'], ['gh', '🪝 그래플링 훅'], ['chute', '🪂 낙하산'], ['vest', '🦺 방탄조끼'], ['bag', '💼 현금 가방'], ['pvp', '⚔️ PvP 모드']];
 let accts = [], selName = null, aOwn = {}, online = [], onlineNames = new Set();
 const MAXM = 9e15;
-function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; o.en = (o.en && typeof o.en === 'object' && !Array.isArray(o.en)) ? o.en : {}; return o; }
+function normOwn(o) { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; o.cars = (o.cars && typeof o.cars === 'object') ? o.cars : {}; o.wu = (o.wu && typeof o.wu === 'object') ? o.wu : {}; o.wp = Array.isArray(o.wp) ? o.wp : []; o.en = (o.en && typeof o.en === 'object' && !Array.isArray(o.en)) ? o.en : {}; o.inv = Array.isArray(o.inv) ? o.inv : []; o.pot = (o.pot && typeof o.pot === 'object' && !Array.isArray(o.pot)) ? o.pot : {}; return o; }
 async function loadAccts() {
   try { accts = await rpc('cc_admin_list', { pw }) || []; renderAccts(); } catch (e) { toast('계정 목록 실패: ' + e.message, 0); }
 }
@@ -298,9 +308,9 @@ function renderEd() {
     const es = document.createElement('select'); es.title = '인첸트 종류'; es.innerHTML = '<option value="-1">인첸트 없음</option>' + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
     const el = document.createElement('select'); el.title = '인첸트 레벨'; el.innerHTML = '<option>1</option><option>2</option><option>3</option>';
     const cur = Array.isArray(aOwn.en[idx]) ? (typeof aOwn.en[idx][0] === 'number' ? aOwn.en[idx] : aOwn.en[idx][0]) : null; es.value = cur ? cur[0] : -1; el.value = cur ? cur[1] : 1;
-    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;gap:4px'; ex.append(sel, es, el);
+    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;gap:4px;align-items:center'; ex.append(sel, es, el); if (enList(aOwn.en[idx]).length > 1) { const m = document.createElement('small'); m.textContent = '+ ' + enText(aOwn.en[idx]); m.title = '인첸트 여러 개'; ex.append(m); }
     const [l, cb] = chip(aOwn[idx], nm, ex);
-    const setEn = () => { const t = Number(es.value); if (t >= 0) { aOwn[idx] = 1; aOwn.en[idx] = [t, Number(el.value) || 1]; cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
+    const setEn = () => { const t = Number(es.value); if (t >= 0) { aOwn[idx] = 1; { const L = Array.isArray(aOwn.en[idx]) && typeof aOwn.en[idx][0] !== 'number' ? aOwn.en[idx] : null; if (L && L.length) L[0] = [t, Number(el.value) || 1]; else aOwn.en[idx] = [t, Number(el.value) || 1]; } cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
     es.onchange = setEn; el.onchange = setEn;
     cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; es.value = -1; } l.classList.toggle('on', cb.checked); syncJson(); };
     sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
@@ -316,8 +326,35 @@ function renderEd() {
     cb.onchange = () => { if (cb.checked) { aOwn[k] = 1; if (k === 'pvp' && aOwn.pvpOn === undefined) aOwn.pvpOn = 1; } else { delete aOwn[k]; if (k === 'pvp') delete aOwn.pvpOn; } l.classList.toggle('on', cb.checked); syncJson(); };
     P.appendChild(l);
   }
-  $('aAb').value = Number(aOwn.ab) || 0; $('aJpu').value = Number(aOwn.jpu) || 0; syncJson();
+  $('aAb').value = Number(aOwn.ab) || 0; $('aJpu').value = Number(aOwn.jpu) || 0; renderInvEd(); syncJson();
 }
+const enList = x => Array.isArray(x) ? (typeof x[0] === 'number' ? [x] : x).filter(p => Array.isArray(p) && ENCHN[p[0]]) : [];
+const enText = x => enList(x).map(p => ENCHN[p[0]] + ' Lv' + p[1]).join(' + ');
+const wNmI = w => { const f = WEAPONS.find(x => x[0] === w); return f ? f[1] : '무기 #' + w; };
+const SELI = 'background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:6px';
+function renderInvEd() {
+  document.querySelectorAll('.aPot').forEach(el => { el.value = Number(aOwn.pot[el.dataset.k]) || 0; });
+  const box = $('aInv'); box.innerHTML = ''; $('aInvN').textContent = '· ' + aOwn.inv.length + ' / 80';
+  if (!aOwn.inv.length) { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = '비어 있어요'; box.appendChild(d); }
+  aOwn.inv.forEach((it, n) => {
+    const r = document.createElement('div'); r.style.cssText = 'display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px';
+    const t = document.createElement('span'); t.style.flex = '1'; t.textContent = wNmI(it.w) + ' +' + (it.lv | 0) + (enText(it.en) ? ' · ' + enText(it.en) : '');
+    const b = document.createElement('button'); b.className = 'bad'; b.textContent = '삭제'; b.onclick = () => { aOwn.inv.splice(n, 1); renderInvEd(); syncJson(); };
+    r.append(t, b); box.appendChild(r);
+  });
+  const add = $('aInvAdd'); if (add.dataset.ready) return; add.dataset.ready = 1;
+  add.innerHTML = `<select id="iaW" style="${SELI}">${WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select><input id="iaLv" type="number" min="0" max="99" value="1" title="강화 단계 (0~99)" style="width:70px">`
+    + [1, 2, 3, 4].map(k => `<span style="display:flex;gap:3px"><select class="iaEn" style="${SELI}"><option value="-1">인첸트${k} · 없음</option>${ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select><select class="iaEl" style="${SELI}"><option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option></select></span>`).join('')
+    + '<button id="iaGo" class="pri">인벤토리에 추가</button>';
+  $('iaGo').onclick = () => {
+    if (aOwn.inv.length >= 80) return toast('인벤토리가 가득 찼어요 (80칸)', 0);
+    const ens = [...document.querySelectorAll('.iaEn')], els = [...document.querySelectorAll('.iaEl')], L = [];
+    ens.forEach((e, k) => { const t = Number(e.value); if (t >= 0) L.push([t, Number(els[k].value)]); });
+    aOwn.inv.push({ w: Number($('iaW').value), lv: Math.max(0, Math.min(99, Math.floor(Number($('iaLv').value)) || 0)), en: L.length ? (L.length === 1 ? L[0] : L) : null });
+    renderInvEd(); syncJson();
+  };
+}
+document.addEventListener('input', e => { const el = e.target; if (el.classList && el.classList.contains('aPot')) { const n = Math.max(0, Math.floor(Number(el.value) || 0)); if (n > 0) aOwn.pot[el.dataset.k] = n; else delete aOwn.pot[el.dataset.k]; syncJson(); } });
 function syncJson() { $('aJson').value = JSON.stringify(aOwn, null, 1); }
 $('aAb').oninput = () => { const n = Math.max(0, Math.floor(Number($('aAb').value) || 0)); if (n > 0) aOwn.ab = n; else delete aOwn.ab; syncJson(); };
 $('aJpu').oninput = () => { const n = Math.min(5, Math.max(0, Math.floor(Number($('aJpu').value) || 0))); aOwn.jpu = n; syncJson(); };
