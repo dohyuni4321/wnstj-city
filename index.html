@@ -3730,7 +3730,7 @@
     window.addEventListener('online', () => { if (room) { rcN = 0; rcAt = 0; reconnect('인터넷이 다시 연결됐어요'); } });
 
     // ================================================================ v4 시스템 (차 가게 · 차키 · 안내 화살표 · 웨이포인트 · 그래플링 · 강화소)
-    own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0; stripOff();
+    own.cars = own.cars || {}; own.wp = own.wp || []; own.wu = own.wu || {}; own.jpu = own.jpu || 0;
     const ownCar = new Map();               // 차 id → 실제 차량 객체
     function stripOff() {
       for (let i = 6; i < WP.length; i++) if (WP[i].off) { delete own[i]; if (own.wu) delete own.wu[i]; if (own.en) delete own.en[i]; } if (WP[wi] && WP[wi].off) wi = 0;
@@ -3759,6 +3759,7 @@
     }
     const invCount = w => Array.isArray(own.inv) ? own.inv.filter(x => x.w === w).length : 0;
     function invPush(w, lv, en) { if (!Array.isArray(own.inv)) own.inv = []; if (own.inv.length >= INV_MAX) return false; own.inv.push({ w, lv: lv | 0, en: en ? en.slice() : null }); return true; }
+    stripOff();   // 인벤토리 정의 뒤에서 호출해야 해요 (앞에서 부르면 초기화 오류로 화면이 까맣게 돼요)
     const saveOwn = () => { LS.set('cc_own', JSON.stringify(own)); };
     const fmt = n => '$' + Math.round(n).toLocaleString();
     const wlv = i => (own.wu && own.wu[i]) || 0;
