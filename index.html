@@ -466,12 +466,17 @@
     { id: 'well', ic: '🕳️', n: '인력', t: 'hit', v: [0.08, 0.14, 0.22], d: v => `적중 시 ${pct(v)}% 확률로 소형 블랙홀 (3초, 쿨타임 2초)` },
     { id: 'swift', ic: '💨', n: '질주', t: 'any', v: [1.1, 1.2, 1.35], d: v => `이 무기를 든 동안 이동 속도 +${pct(v - 1)}%` },
     { id: 'exec', ic: '☠️', n: '처형', t: 'hit', v: [0.25, 0.35, 0.5], d: v => `체력 ${pct(v)}% 이하 경찰·경찰차 즉사` },
-    { id: 'reload', ic: '🔄', n: '속장전', t: 'any', v: [0.7, 0.5, 0.3], d: v => `장전 시간 ${pct(1 - v)}% 단축` }
+    { id: 'reload', ic: '🔄', n: '속장전', t: 'any', v: [0.7, 0.5, 0.3], d: v => `장전 시간 ${pct(1 - v)}% 단축` },
+    // 👑 레전드 인첸트 — 강화소에서 새 인첸트를 부여할 때 10% 확률로 대신 붙어요 (선택 불가 · 경매·관리자로도 유통)
+    { id: 'l_thunder', leg: 1, ic: '🌩️', n: '뇌신', t: 'hit', v: [0.35, 0.35, 0.35], d: v => '적중 시 35% 확률로 낙뢰 대폭발 (플레이어에게도 강한 피해)' },
+    { id: 'l_midas', leg: 1, ic: '👑', n: '미다스', t: 'hit', v: [1500, 1500, 1500], d: v => '적중할 때마다 +$1,500 · 8% 확률로 +$25,000 잭팟' },
+    { id: 'l_void', leg: 1, ic: '🌌', n: '공허', t: 'hit', v: [0.25, 0.25, 0.25], d: v => '적중 시 25% 확률로 대형 블랙홀 (모두 빨아들임)' },
+    { id: 'l_time', leg: 1, ic: '⏳', n: '시간 지배', t: 'any', v: [0.5, 0.5, 0.5], d: v => '연사 2배 · 장전 70% 단축 · 이동 +25% · 25% 탄약 무소모 · 30% 치명타' }
   ];
   const ENCH_COST = [30000, 120000, 400000];   // 1 / 2 / 3레벨
   const ENCH_TICKET = 50000;
   // 무기별로 쓸 수 있는 인첸트 (화염방사기는 총알이 아니라서 일부만 · 저격총은 탄 성질형 불가)
-  const enchOk = (wIdx, e) => { const w = WP[wIdx]; if (!w || w.off) return false; if (w.flame) return e.id === 'swift' || e.id === 'reload'; if (w.hs) return !['pierce', 'split', 'storm'].includes(e.id); return true; };
+  const enchOk = (wIdx, e) => { const w = WP[wIdx]; if (!w || w.off) return false; if (e.leg) return !w.flame; if (w.flame) return e.id === 'swift' || e.id === 'reload'; if (w.hs) return !['pierce', 'split', 'storm'].includes(e.id); return true; };
 
   const pp = p => p.beach ? [p.x, p.y] : [p.h ? p.t : p.k * B + p.off, p.h ? p.k * B + p.off : p.t];
 
@@ -3781,6 +3786,7 @@
         else if (id === 'storm') r.chain = r.chain || (Math.random() < v ? 1 : 0);
         else if (id === 'haste') r.cdm *= v;
         else if (id === 'ghost') r.stl *= v;
+        else if (id === 'l_time') { r.cdm *= 0.5; r.crit = r.crit || Math.random() < 0.3; r.free = r.free || Math.random() < 0.25; }
         else if (e.d.t === 'hit') (r.hit = r.hit || []).push({ id, v, lv: e.lv });
       }
       return r;
@@ -3796,6 +3802,9 @@
         else if (k === 'o') { const j = offs.indexOf(t); if (j >= 0) { t.dead = Math.max(t.dead || 0, v); t.m.rotation.z = Math.PI / 2; } }
       }
       else if (id === 'well') { if (Math.random() < v && now - enGate > 2000) { enGate = now; wellAdd(b.x, b.y, 14); } }
+      else if (id === 'l_thunder') { if (Math.random() < v && now - enGate > 300) { enGate = now; boom(b.x, b.y, 85, 120); playSound('boom'); if (k === 'v') pvpHit(t, 40, 9); } }
+      else if (id === 'l_midas') { money += v; if (Math.random() < 0.08) { money += 25000; msg('👑 미다스 잭팟! +$25,000'); playSound('cash'); } else if (now - enGate > 400) { enGate = now; playSound('cash'); } }
+      else if (id === 'l_void') { if (Math.random() < v && now - enGate > 3500) { enGate = now; wellAdd(b.x, b.y, 60, 1); } }
       if (k === 'v') {   // 🧑 PvP: 맞은 플레이어에게도 인첸트 효과
         if (id === 'frost') pvpHit(t, 0, 4);                                  // 빙결 = 스턴
         else if (id === 'blast') { if (Math.random() < v) pvpHit(t, 8 + e.lv * 8, 9); }   // 폭렬 추가 피해
@@ -3808,8 +3817,8 @@
         else if (k === 'c' && t.type === 'c' && cars.includes(t) && t.hp <= (t.mhp || 100) * v) dmgCar(t, 99999);
       }
     }
-    const relMul = () => 1 / enProd(wi, 'reload');
-    const swiftMul = () => P.onFoot ? enProd(wi, 'swift') : 1;
+    const relMul = () => (1 / enProd(wi, 'reload')) * (enAll(wi).some(e => e.d.id === 'l_time') ? 1 / 0.3 : 1);
+    const swiftMul = () => P.onFoot ? enProd(wi, 'swift') * (enAll(wi).some(e => e.d.id === 'l_time') ? 1.25 : 1) : 1;
     let panel = null, wpBusy = false, stNear = null, ghCd = 0;
     const v4css = document.createElement('style');
     v4css.textContent = `.v4p{position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.66);font-family:system-ui}
@@ -3943,16 +3952,16 @@
       } else if (enTab === 'ench') {
         for (let i = 0; i < WP.length; i++) {
           if (WP[i].off || (i >= 6 && !own[i])) continue;
-          const cur = enNorm(own.en && own.en[i])[0], list = ENCH.map((e, k) => [e, k]).filter(([e]) => enchOk(i, e));
+          const cur = enNorm(own.en && own.en[i])[0], list = ENCH.map((e, k) => [e, k]).filter(([e]) => !e.leg && enchOk(i, e));
           if (!list.length) continue;
           let sel = enSel[i] !== undefined ? enSel[i] : (cur ? cur[0] : list[0][1]); if (!list.some(([, k]) => k === sel)) sel = list[0][1]; enSel[i] = sel;
           const e = ENCH[sel], same = cur && cur[0] === sel, nl = same ? Math.min(3, cur[1] + 1) : 1, mx = same && cur[1] >= 3, cost = ENCH_COST[nl - 1];
           h += `<div class="row" style="flex-wrap:wrap"><div class="nm" style="min-width:150px">${WP[i].n}${wlv(i) ? ` <span style="color:#ffb347">+${wlv(i)}</span>` : ''}<div class="ds">${cur && ENCH[cur[0]] ? `현재 ${ENCH[cur[0]].ic} ${ENCH[cur[0]].n} Lv${cur[1]}` : '인첸트 없음'}</div></div>`
             + `<select class="es" data-i="${i}">${list.map(([x, k]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${x.ic} ${x.n}</option>`).join('')}</select>`
-            + `<div class="btn o${mx || money < cost ? ' dis' : ''}" data-en="${i}">${mx ? 'MAX' : (same ? (nl === 3 ? `👑 레전드 Lv3 도전 (10%) ${fmt(cost)}` : `Lv${nl} 강화 ${fmt(cost)}`) : (cur ? `교체 ${fmt(cost)}` : `부여 ${fmt(cost)}`))}</div>`
+            + `<div class="btn o${mx || money < cost ? ' dis' : ''}" data-en="${i}">${mx ? 'MAX' : (same ? `Lv${nl} 강화 ${fmt(cost)}` : (cur ? `교체 ${fmt(cost)}` : `부여 ${fmt(cost)}`))}</div>`
             + `<div class="ds" style="flex-basis:100%;margin:0">${e.ic} ${e.n} ${[1, 2, 3].map(l => `<b${(cur && cur[0] === sel && cur[1] === l) ? ' style="color:#ffd23f"' : ''}>Lv${l}</b>: ${e.d(e.v[l - 1])}`).join(' · ')}</div></div>`;
         }
-        h += '<div class="ds" style="text-align:center;margin-top:6px">Lv3(레전드 인첸트)는 성공 확률 10% (실패해도 비용은 나가요) · 다른 인첸트로 교체하면 기존 인첸트는 사라져요 · 인첸트는 경매에 팔 때 무기와 함께 가요</div>';
+        h += '<div class="ds" style="text-align:center;margin-top:6px">새 인첸트를 부여할 때마다 10% 확률로 👑 레전드 인첸트(뇌신·미다스·공허·시간 지배)가 대신 붙어요 · 다른 인첸트로 교체하면 기존 인첸트는 사라져요 · 인첸트는 경매에 팔 때 무기와 함께 가요</div>';
       } else {
         for (let i = 0; i < WP.length; i++) {
           if (WP[i].off || (i >= 6 && !own[i])) continue;
@@ -3990,7 +3999,10 @@
       const nl = same ? cur[1] + 1 : 1, cost = ENCH_COST[nl - 1];
       if (money < cost) { enNote(`돈이 부족해요 (${fmt(cost - money)} 더 필요)`, 0); playSound('shoot'); return; }
       money -= cost;
-      if (nl === 3 && Math.random() >= 0.1) { saveOwn(); playSound('shoot'); enNote(`💨 레전드 인첸트(Lv3) 도전 실패 · 성공 확률 10% · ${fmt(cost)} 사용`, 0); renderEnh(); return; }
+      if (!same && Math.random() < 0.1) {   // 👑 10% 확률로 레전드 인첸트
+        const lg = ENCH.map((e, k) => [e, k]).filter(([e]) => e.leg && enchOk(i, e));
+        if (lg.length) { const [le, lk] = lg[Math.floor(Math.random() * lg.length)]; own.en = own.en || {}; own.en[i] = [lk, 3]; saveOwn(); playSound('cash'); enNote(`👑 레전드 인첸트 대박! ${WP[i].n} · ${le.ic} ${le.n} — ${le.d(le.v[2])}`, 1); title('👑 레전드 인첸트!', `${WP[i].n} · ${le.ic} ${le.n}`, '#ffd23f'); event(`님이 ${WP[i].n}에 👑 레전드 인첸트 ${le.ic} ${le.n}를 뽑았습니다!!`); renderEnh(); return; }
+      }
       own.en = own.en || {}; { const L = enNorm(own.en[i]); if (same && L.length > 1) { L[0] = [sel, nl]; own.en[i] = L; } else own.en[i] = [sel, nl]; } saveOwn(); playSound('cash');
       enNote(`🔮 ${WP[i].n} · ${ENCH[sel].ic} ${ENCH[sel].n} Lv${nl}`, 1);
       if (nl === 3) event(`님이 ${WP[i].n}에 ${ENCH[sel].ic} ${ENCH[sel].n} Lv3 인첸트를 완성했습니다!`);
