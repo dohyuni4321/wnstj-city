@@ -3941,71 +3941,93 @@
     }
 
     // ---------------------------------------------------------------- 무기 강화소 (강화 최대 +99 · 인첸트 탭은 이용권($50,000)을 사야 열림)
-    let enTab = 'enh'; const enSel = {};
+    let enTab = 'enh', enT = null, enPick = false, enSelK = null;   // enT: { s: 'h', i } 핫바 무기 · { s: 'v', n } 인벤토리 무기
     const enNote = (t, ok) => { $('enRes').style.color = ok ? '#6f6' : '#f66'; $('enRes').textContent = t; };
+    const tOk = t => t && (t.s === 'h' ? (WP[t.i] && !WP[t.i].off && (t.i < 6 || own[t.i])) : !!(Array.isArray(own.inv) && own.inv[t.n]));
+    const tW = t => t.s === 'h' ? t.i : own.inv[t.n].w;
+    const tLv = t => t.s === 'h' ? wlv(t.i) : (own.inv[t.n].lv | 0);
+    const tSetLv = (t, v) => { if (t.s === 'h') { own.wu = own.wu || {}; own.wu[t.i] = v; } else own.inv[t.n].lv = v; };
+    const tEn = t => enNorm(t.s === 'h' ? (own.en && own.en[t.i]) : own.inv[t.n].en);
+    const tSetEn = (t, v) => { if (t.s === 'h') { own.en = own.en || {}; if (v) own.en[t.i] = v; else delete own.en[t.i]; } else own.inv[t.n].en = v || null; };
+    const tTag = t => { const L = tEn(t).filter(p => ENCH[p[0]]); return L.length ? ' ' + L.map(p => `${ENCH[p[0]].ic}${ENCH[p[0]].n}${'I'.repeat(p[1])}`).join('') : ''; };
+    const tName = t => WP[tW(t)].n + (tLv(t) ? ' +' + tLv(t) : '') + (t.s === 'v' ? ' 🎒' : '');
     function renderEnh() {
       $('enMoney').textContent = '💰 ' + fmt(money);
       $('enTabs').innerHTML = `<span class="tb${enTab === 'enh' ? ' on' : ''}" data-tab="enh">⚒ 강화</span><span class="tb${enTab === 'ench' ? ' on' : ''}" data-tab="ench">🔮 인첸트${own.ench ? '' : ' 🔒'}</span>`;
+      if (enT && !tOk(enT)) enT = null;
       let h = '';
       if (enTab === 'ench' && !own.ench) {
-        h = `<div class="ds" style="padding:22px;text-align:center;line-height:1.7">🔒 <b>인첸트 이용권</b>이 필요해요<br>상점(U)에서 <b>${fmt(ENCH_TICKET)}</b>에 사면 이 탭이 영구히 열려요<br>무기마다 인첸트 1개 · 15종 · 최대 3레벨</div>`;
-      } else if (enTab === 'ench') {
-        for (let i = 0; i < WP.length; i++) {
-          if (WP[i].off || (i >= 6 && !own[i])) continue;
-          const cur = enNorm(own.en && own.en[i])[0], list = ENCH.map((e, k) => [e, k]).filter(([e]) => !e.leg && enchOk(i, e));
-          if (!list.length) continue;
-          let sel = enSel[i] !== undefined ? enSel[i] : (cur ? cur[0] : list[0][1]); if (!list.some(([, k]) => k === sel)) sel = list[0][1]; enSel[i] = sel;
+        $('enList').innerHTML = `<div class="ds" style="padding:22px;text-align:center;line-height:1.7">🔒 <b>인첸트 이용권</b>이 필요해요<br>상점(U)에서 <b>${fmt(ENCH_TICKET)}</b>에 사면 이 탭이 영구히 열려요<br>무기마다 인첸트 1개 · 15종 + 👑 레전드</div>`; return;
+      }
+      // 무기 선택 버튼 (핫바 + 인벤토리 중에서 하나 골라서 작업)
+      h += `<div class="row"><div class="nm">${enT ? `선택한 무기: <b style="color:#ffd23f">⚔️ ${esc(tName(enT))}</b><span style="color:#c9a6ff;font-size:12px">${esc(tTag(enT))}</span>` : '<span style="color:#9fb3c8">무기를 골라 주세요</span>'}<div class="ds">핫바와 인벤토리(🎒)에 있는 무기 중 하나를 선택해서 ${enTab === 'enh' ? '강화' : '인첸트'}해요</div></div><div class="btn" data-pickbtn="1">${enPick ? '닫기' : (enT ? '무기 바꾸기' : '🔎 무기 선택')}</div></div>`;
+      if (enPick) {
+        const card = (key, t) => `<div class="cd${enT && ((t.s === 'h' && enT.s === 'h' && enT.i === t.i) || (t.s === 'v' && enT.s === 'v' && enT.n === t.n)) ? ' hl' : ''}" data-pk="${key}"><div class="nm">⚔️ ${esc(tName(t))}</div><div class="ds" style="margin:2px 0 0">${tEn(t).length ? esc(tTag(t)) : '인첸트 없음'}</div></div>`;
+        h += '<div class="ds" style="margin:8px 0 4px">🎯 핫바</div><div class="gr">';
+        for (let w = 0; w < WP.length; w++) if (!WP[w].off && (w < 6 || own[w])) h += card('h:' + w, { s: 'h', i: w });
+        h += '</div>';
+        const inv = Array.isArray(own.inv) ? own.inv : [];
+        h += '<div class="ds" style="margin:10px 0 4px">🎒 인벤토리</div>' + (inv.length ? '<div class="gr">' + inv.map((x, n) => card('v:' + n, { s: 'v', n })).join('') + '</div>' : '<div class="ds" style="padding:8px">인벤토리가 비어 있어요</div>');
+        $('enList').innerHTML = h; return;
+      }
+      if (!enT) { $('enList').innerHTML = h; return; }
+      const w = tW(enT), lv = tLv(enT);
+      if (enTab === 'ench') {
+        const cur = tEn(enT)[0], list = ENCH.map((e, k) => [e, k]).filter(([e]) => !e.leg && enchOk(w, e));
+        if (!list.length) { h += '<div class="ds" style="padding:12px">이 무기에는 인첸트를 붙일 수 없어요</div>'; }
+        else {
+          let sel = enSelK !== null && list.some(([, k]) => k === enSelK) ? enSelK : (cur && list.some(([, k]) => k === cur[0]) ? cur[0] : list[0][1]); enSelK = sel;
           const e = ENCH[sel], same = cur && cur[0] === sel, nl = same ? Math.min(3, cur[1] + 1) : 1, mx = same && cur[1] >= 3, cost = ENCH_COST[nl - 1];
-          h += `<div class="row" style="flex-wrap:wrap"><div class="nm" style="min-width:150px">${WP[i].n}${wlv(i) ? ` <span style="color:#ffb347">+${wlv(i)}</span>` : ''}<div class="ds">${cur && ENCH[cur[0]] ? `현재 ${ENCH[cur[0]].ic} ${ENCH[cur[0]].n} Lv${cur[1]}` : '인첸트 없음'}</div></div>`
-            + `<select class="es" data-i="${i}">${list.map(([x, k]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${x.ic} ${x.n}</option>`).join('')}</select>`
-            + `<div class="btn o${mx || money < cost ? ' dis' : ''}" data-en="${i}">${mx ? 'MAX' : (same ? `Lv${nl} 강화 ${fmt(cost)}` : (cur ? `교체 ${fmt(cost)}` : `부여 ${fmt(cost)}`))}</div>`
+          h += `<div class="row" style="flex-wrap:wrap"><div class="nm" style="min-width:150px">현재 인첸트<div class="ds">${tEn(enT).length ? esc(tTag(enT)) : '없음'}</div></div>`
+            + `<select class="es">${list.map(([x, k]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${x.ic} ${x.n}</option>`).join('')}</select>`
+            + `<div class="btn o${mx || money < cost ? ' dis' : ''}" data-en="1">${mx ? 'MAX' : (same ? `Lv${nl} 강화 ${fmt(cost)}` : (cur ? `교체 ${fmt(cost)}` : `부여 ${fmt(cost)}`))}</div>`
             + `<div class="ds" style="flex-basis:100%;margin:0">${e.ic} ${e.n} ${[1, 2, 3].map(l => `<b${(cur && cur[0] === sel && cur[1] === l) ? ' style="color:#ffd23f"' : ''}>Lv${l}</b>: ${e.d(e.v[l - 1])}`).join(' · ')}</div></div>`;
         }
         h += '<div class="ds" style="text-align:center;margin-top:6px">새 인첸트를 부여할 때마다 10% 확률로 👑 레전드 인첸트(뇌신·미다스·공허·시간 지배)가 대신 붙어요 · 다른 인첸트로 교체하면 기존 인첸트는 사라져요 · 인첸트는 경매에 팔 때 무기와 함께 가요</div>';
       } else {
-        for (let i = 0; i < WP.length; i++) {
-          if (WP[i].off || (i >= 6 && !own[i])) continue;
-          const lv = wlv(i), mx = lv >= ENH_MAX;
-          h += `<div class="row"><div class="nm">${WP[i].n} <span style="color:#ffb347">${lv ? '+' + lv : ''}</span>${enTag(i) ? `<span style="color:#c9a6ff;font-size:12px">${enTag(i)}</span>` : ''}<div class="ds">${mx ? 'MAX 강화 완료 (+99)' : `성공 ${enhChance(lv)}% · 비용 ${fmt(enhCost(lv))}${ENH_DROP(lv) ? ' · 실패 시 −1단계' : ''}`} · 데미지 ×${dmgMul(lv).toFixed(2)} · 연사 ×${(1 / cdMul(lv)).toFixed(2)}</div></div><div class="btn o${mx || money < enhCost(lv) ? ' dis' : ''}" data-i="${i}">${mx ? 'MAX' : '강화'}</div></div>`;
-        }
+        const mx = lv >= ENH_MAX;
+        h += `<div class="row"><div class="nm">${esc(WP[w].n)} <span style="color:#ffb347">${lv ? '+' + lv : ''}</span><div class="ds">${mx ? 'MAX 강화 완료 (+99)' : `성공 ${enhChance(lv)}% · 비용 ${fmt(enhCost(lv))}${ENH_DROP(lv) ? ' · 실패 시 −1단계' : ''}`} · 데미지 ×${dmgMul(lv).toFixed(2)} · 연사 ×${(1 / cdMul(lv)).toFixed(2)}</div></div><div class="btn o${mx || money < enhCost(lv) ? ' dis' : ''}" data-i="1">${mx ? 'MAX' : '강화'}</div></div>`;
       }
       $('enList').innerHTML = h;
     }
     enhEl.addEventListener('click', e => {
-      const tb = e.target.closest('.tb'); if (tb) { enTab = tb.dataset.tab; $('enRes').textContent = ''; renderEnh(); return; }
+      const tb = e.target.closest('.tb'); if (tb) { enTab = tb.dataset.tab; enPick = false; $('enRes').textContent = ''; renderEnh(); return; }
+      const pk = e.target.closest('[data-pk]'); if (pk) { const [s2, n2] = pk.dataset.pk.split(':'); enT = s2 === 'h' ? { s: 'h', i: +n2 } : { s: 'v', n: +n2 }; enPick = false; enSelK = null; $('enRes').textContent = ''; renderEnh(); return; }
       const t = e.target.closest('.btn'); if (!t) return;
-      if (t.dataset.i !== undefined) enhance(+t.dataset.i); else if (t.dataset.en !== undefined) enchant(+t.dataset.en);
+      if (t.dataset.pickbtn) { enPick = !enPick; renderEnh(); return; }
+      if (!enT || !tOk(enT)) return;
+      if (t.dataset.i !== undefined) enhance(); else if (t.dataset.en !== undefined) enchant();
     });
-    enhEl.addEventListener('change', e => { const s = e.target.closest('.es'); if (s) { enSel[+s.dataset.i] = +s.value; renderEnh(); } });
-    function enhance(i) {
-      const lv = wlv(i); if (lv >= ENH_MAX) return;
+    enhEl.addEventListener('change', e => { const s = e.target.closest('.es'); if (s) { enSelK = +s.value; renderEnh(); } });
+    function enhance() {
+      const t = enT, w = tW(t), lv = tLv(t); if (lv >= ENH_MAX) return;
       const cost = enhCost(lv); if (money < cost) { enNote(`돈이 부족해요 (${fmt(cost - money)} 더 필요)`, 0); playSound('shoot'); return; }
-      money -= cost; own.wu = own.wu || {};
+      money -= cost;
       if (Math.random() * 100 < enhChance(lv)) {
-        own.wu[i] = lv + 1; enNote(`✨ 강화 성공! ${WP[i].n} +${lv + 1}`, 1); playSound('cash');
-        if (lv + 1 >= 7 && (lv + 1 <= 10 || (lv + 1) % 5 === 0)) event(`님이 ${WP[i].n}을(를) +${lv + 1} 강화에 성공했습니다! 🔨`);
-        if (lv + 1 === ENH_MAX) title('🔨 99강 달성!', `${myName} · ${WP[i].n} +99`, '#ffd23f');
+        tSetLv(t, lv + 1); enNote(`✨ 강화 성공! ${WP[w].n} +${lv + 1}`, 1); playSound('cash');
+        if (lv + 1 >= 7 && (lv + 1 <= 10 || (lv + 1) % 5 === 0)) event(`님이 ${WP[w].n}을(를) +${lv + 1} 강화에 성공했습니다! 🔨`);
+        if (lv + 1 === ENH_MAX) title('🔨 99강 달성!', `${myName} · ${WP[w].n} +99`, '#ffd23f');
       } else {
-        if (ENH_DROP(lv)) { own.wu[i] = lv - 1; enNote(`💥 강화 실패... ${WP[i].n} +${lv} → +${lv - 1}`, 0); }
-        else enNote(`💨 강화 실패 (단계 유지) ${WP[i].n} +${lv}`, 0);
+        if (ENH_DROP(lv)) { tSetLv(t, lv - 1); enNote(`💥 강화 실패... ${WP[w].n} +${lv} → +${lv - 1}`, 0); }
+        else enNote(`💨 강화 실패 (단계 유지) ${WP[w].n} +${lv}`, 0);
         playSound('boom');
       }
       saveOwn(); renderEnh();
     }
-    function enchant(i) {
+    function enchant() {
       if (!own.ench) { enNote('인첸트 이용권이 필요해요', 0); return; }
-      const sel = enSel[i]; if (sel === undefined || !ENCH[sel] || !enchOk(i, ENCH[sel])) return;
-      const cur = enNorm(own.en && own.en[i])[0], same = cur && cur[0] === sel; if (same && cur[1] >= 3) return;
+      const t = enT, w = tW(t), sel = enSelK; if (sel === null || !ENCH[sel] || !enchOk(w, ENCH[sel])) return;
+      const cur = tEn(t)[0], same = cur && cur[0] === sel; if (same && cur[1] >= 3) return;
       const nl = same ? cur[1] + 1 : 1, cost = ENCH_COST[nl - 1];
       if (money < cost) { enNote(`돈이 부족해요 (${fmt(cost - money)} 더 필요)`, 0); playSound('shoot'); return; }
       money -= cost;
       if (!same && Math.random() < 0.1) {   // 👑 10% 확률로 레전드 인첸트
-        const lg = ENCH.map((e, k) => [e, k]).filter(([e]) => e.leg && enchOk(i, e));
-        if (lg.length) { const [le, lk] = lg[Math.floor(Math.random() * lg.length)]; own.en = own.en || {}; own.en[i] = [lk, 3]; saveOwn(); playSound('cash'); enNote(`👑 레전드 인첸트 대박! ${WP[i].n} · ${le.ic} ${le.n} — ${le.d(le.v[2])}`, 1); title('👑 레전드 인첸트!', `${WP[i].n} · ${le.ic} ${le.n}`, '#ffd23f'); event(`님이 ${WP[i].n}에 👑 레전드 인첸트 ${le.ic} ${le.n}를 뽑았습니다!!`); renderEnh(); return; }
+        const lg = ENCH.map((e, k) => [e, k]).filter(([e]) => e.leg && enchOk(w, e));
+        if (lg.length) { const [le, lk] = lg[Math.floor(Math.random() * lg.length)]; tSetEn(t, [lk, 3]); saveOwn(); playSound('cash'); enNote(`👑 레전드 인첸트 대박! ${WP[w].n} · ${le.ic} ${le.n} — ${le.d(le.v[2])}`, 1); title('👑 레전드 인첸트!', `${WP[w].n} · ${le.ic} ${le.n}`, '#ffd23f'); event(`님이 ${WP[w].n}에 👑 레전드 인첸트 ${le.ic} ${le.n}를 뽑았습니다!!`); renderEnh(); return; }
       }
-      own.en = own.en || {}; { const L = enNorm(own.en[i]); if (same && L.length > 1) { L[0] = [sel, nl]; own.en[i] = L; } else own.en[i] = [sel, nl]; } saveOwn(); playSound('cash');
-      enNote(`🔮 ${WP[i].n} · ${ENCH[sel].ic} ${ENCH[sel].n} Lv${nl}`, 1);
-      if (nl === 3) event(`님이 ${WP[i].n}에 ${ENCH[sel].ic} ${ENCH[sel].n} Lv3 인첸트를 완성했습니다!`);
+      { const L = tEn(t); if (same && L.length > 1) { L[0] = [sel, nl]; tSetEn(t, L); } else tSetEn(t, [sel, nl]); } saveOwn(); playSound('cash');
+      enNote(`🔮 ${WP[w].n} · ${ENCH[sel].ic} ${ENCH[sel].n} Lv${nl}`, 1);
+      if (nl === 3) event(`님이 ${WP[w].n}에 ${ENCH[sel].ic} ${ENCH[sel].n} Lv3 인첸트를 완성했습니다!`);
       renderEnh();
     }
 
