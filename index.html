@@ -1142,11 +1142,11 @@
     for (const r of robs) {
       if (r.cool > 0) r.cool -= dt;
       r.m.visible = r.cool <= 0 && Math.hypot(r.x - tg.x, r.y - tg.y) < 700;
-      if (r.cool <= 0 && P.onFoot && !P.climb && !P.roof && Math.hypot(P.x - r.x, P.y - r.y) < rt(r).r) robNear = r;
+      if (r.cool <= 0 && P.onFoot && !P.climb && !P.roof && (!MP.raid() || P.z < 12) && Math.hypot(P.x - r.x, P.y - r.y) < rt(r).r) robNear = r;
     }
     if (robbing) {
       const r = robbing.r;
-      if (!P.onFoot || tased > 0 || Math.hypot(P.x - r.x, P.y - r.y) > rt(r).f) { robbing = null; msg('강도 실패! 자리를 벗어남'); }
+      if (!P.onFoot || tased > 0 || (MP.raid() && P.z > 14) || Math.hypot(P.x - r.x, P.y - r.y) > rt(r).f) { robbing = null; msg('강도 실패! 자리를 벗어남' + (MP.raid() && P.z > 14 ? ' (레이드에서는 땅에서만 털 수 있어요)' : '')); }
       else {
         robbing.t += dt; heat = Math.max(heat, rt(r).h);
         if (robbing.t >= robbing.d) {
@@ -1899,7 +1899,7 @@
       c.lx = gx; c.ly = gy;
       const opts = [[c.dx, c.dy], [-c.dy, c.dx], [c.dy, -c.dx]].filter(([a, b]) => { const nx = gx + a * B, ny = gy + b * B; return nx >= B && nx <= W - B && ny >= B && ny <= W - B; });
       if (opts.length) {
-        const o = opts[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * opts.length)] || opts[0]; c.dx = o[0]; c.dy = o[1];
+        const sk = c.seek, o = (sk ? opts.slice().sort((p, q) => Math.hypot(gx + p[0] * B - sk.x, gy + p[1] * B - sk.y) - Math.hypot(gx + q[0] * B - sk.x, gy + q[1] * B - sk.y))[0] : opts[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * opts.length)]) || opts[0]; c.dx = o[0]; c.dy = o[1];
         if (c.dx) { c.x = gx; c.y = gy + c.dx * 22; } else { c.y = gy; c.x = gx - c.dy * 22; }
       }
     }
@@ -1948,34 +1948,54 @@
     }
   }
 
-  function spawnPolice() {
-    const tg = P.onFoot ? P : P.car; 
-    const stars = Math.min(5, Math.ceil(heat - 1e-6));
-
+  // ================================================================ 🚔 경찰 시스템 v2: 순찰 → 발견 → 지원 요청(인력 모집) → 추격
+  // 1) 도시에는 순찰차(c.pat)가 도로를 돌아다녀요  2) 수배(★) 중인 나를 발견하면 무전으로 지원 요청 → 주변 순찰차가 합류, 부족한 인원은 멀리서 증원
+  // 3) ★이 높을수록 경찰차 수 + 헬기 수가 늘고, 4★부터 군대(장갑차·탱크·공격헬기)  4) 강도를 하면 경보가 울려서 바로 출동해요
+  let seenT = -99, called = false, patT = 0, heliMsg = 0;
+  const wantCars = st => [0, 2, 3, 5, 7, 9][st] | 0, wantHeli = st => [0, 0, 0, 1, 2, 3][st] | 0;
+  function spawnPatrol() {
+    const tg = P.onFoot ? P : (P.car || P);
     for (let n = 0; n < 30; n++) {
-      const k = Math.floor(rnd(1, N)), t = rnd(B, W - B), h = Math.random() < 0.5, x = h ? t : k * B, y = h ? k * B : t, d = Math.hypot(x - tg.x, y - tg.y);
-      if (d > 600 && d < 1000) {
-        if (MP.raid() && Math.random() < 0.4) {   // 레이드: 경찰 헬기가 플레이어를 끝까지 따라와요
-          cars.push(Object.assign(mkCar(x, y, Math.atan2(tg.y - y, tg.x - x), '#fff', 'c'), VK.heli, { z: 30, mil: 1, kn: '🚁 경찰 헬기', hp: 160, mhp: 160 }));
+      const h = Math.random() < 0.5, sg = Math.random() < 0.5 ? 1 : -1, k = Math.max(1, Math.min(N - 1, Math.round(((h ? tg.y : tg.x) + rnd(-1400, 1400)) / B))), t = Math.max(B + 50, Math.min(W - B - 50, (h ? tg.x : tg.y) + rnd(-1400, 1400)));
+      const c = mkCar(0, 0, 0, '#fff', 'c'); c.pat = 1; c.sp = rnd(120, 150);
+      if (h) { c.dx = sg; c.y = k * B + sg * 22; c.x = t; } else { c.dy = sg; c.x = k * B - sg * 22; c.y = t; }
+      c.a = Math.atan2(c.dy, c.dx); c.v = c.sp; const d = Math.hypot(c.x - tg.x, c.y - tg.y); if (d < 800 || d > 1500) continue;
+      cars.push(c); return;
+    }
+  }
+  // 순찰차 c 가 수배자를 발견했거나 경보를 받음 → 추격 모드 + 주변 순찰차 모집
+  function callIn(c, tg, stars) {
+    c.pat = 0; c.seek = null; seenT = T;
+    if (!called) { called = true; msg('📻 순찰 경찰이 수배자를 발견! 지원 요청 중…'); playSound('siren'); }
+    let need = Math.max(0, wantCars(stars) - 1);
+    const pool = cars.filter(o => o.type === 'c' && o.pat && o !== c && Math.hypot(o.x - tg.x, o.y - tg.y) < 2000).sort((a, b) => Math.hypot(a.x - tg.x, a.y - tg.y) - Math.hypot(b.x - tg.x, b.y - tg.y));
+    for (const o of pool) { if (need-- <= 0) break; o.pat = 0; o.seek = null; }
+    if (stars >= 3 && !heliMsg) { heliMsg = 1; msg(stars >= 4 ? '🚨 지원 요청: 군대와 공격헬기 출동!' : '🚁 지원 요청: 경찰 헬기 출동!'); }
+  }
+  function alarmCall(tg, stars) {   // 강도 경보: 가장 가까운 순찰차를 바로 출동시킴 (없으면 증원이 멀리서 옴)
+    seenT = T; if (!called) { called = true; msg('🚨 강도 신고! 경찰이 출동합니다'); playSound('siren'); }
+    let best = null, bd = 2200; for (const o of cars) if (o.type === 'c' && o.pat) { const d = Math.hypot(o.x - tg.x, o.y - tg.y); if (d < bd) { bd = d; best = o; } }
+    if (best) callIn(best, tg, stars);
+  }
+  function spawnPolice(hw) {
+    const tg = P.onFoot ? P : P.car;
+    const stars = Math.min(5, Math.ceil(heat - 1e-6));
+    let heliN = 0; for (const c of cars) if (c.type === 'c' && !c.pat && c.kind === 'heli') heliN++;
+    const needHeli = heliN < (hw || 0);
+    for (let n = 0; n < 40; n++) {
+      const k = Math.floor(rnd(1, N)), t = rnd(B, W - B), h = Math.random() < 0.5, x = h ? t : k * B, y = h ? k * B : t, d = Math.hypot(x - tg.x, y - tg.y), lo = n < 25 ? 900 : 600, hi = n < 25 ? 1400 : 1000;
+      if (d > lo && d < hi) {
+        const ang = Math.atan2(tg.y - y, tg.x - x), mil = stars >= 4 && !MP.raid();
+        if (needHeli) {
+          const m = stars >= 4 || MP.raid();
+          cars.push(Object.assign(mkCar(x, y, ang, '#fff', 'c'), VK.heli, m ? { z: 40, mil: 1, kn: '군용 공격 헬기', hp: 220, mhp: 220 } : { z: 30, mil: 1, kn: '🚁 경찰 헬기', hp: 160, mhp: 160 }));
+          if (m && !martial) { martial = true; showMartial(); MP.martial(); }
+        } else if (mil && Math.random() < 0.5) {
+          const mType = Math.random();   // 4성 이상: 군대 (장갑차·탱크)
+          cars.push(Object.assign(mkCar(x, y, ang, '#fff', 'c'), mType < 0.6 ? VK.apc : VK.tank, { kn: mType < 0.6 ? '군용 장갑차' : '군용 탱크' }));
           if (!martial) { martial = true; showMartial(); MP.martial(); }
-          return;
-        }
-        if (stars >= 4 && !(MP.raid() && Math.random() < 0.5)) {   // 레이드에서는 일반 경찰차도 절반 섞임
-          // 4성 이상: 군대 스폰 (장갑차, 탱크, 군용 공격 헬기)
-          const mType = Math.random();
-          if (mType < 0.45) {
-            cars.push(Object.assign(mkCar(x, y, Math.atan2(tg.y - y, tg.x - x), '#fff', 'c'), VK.apc, { kn: '군용 장갑차' }));
-          } else if (mType < 0.75) {
-            cars.push(Object.assign(mkCar(x, y, Math.atan2(tg.y - y, tg.x - x), '#fff', 'c'), VK.tank, { kn: '군용 탱크' }));
-          } else {
-            cars.push(Object.assign(mkCar(x, y, Math.atan2(tg.y - y, tg.x - x), '#fff', 'c'), VK.heli, { z: 40, mil: 1, kn: '군용 공격 헬기', hp: 220, mhp: 220 }));
-          }
-          if (!martial) { martial = true; showMartial(); MP.martial(); }
-          msg('🚨 계엄령 선포: 군대(탱크·장갑차·헬기)가 출동했습니다!');
-        } else {
-          // 1~3성: 일반 경찰차
-          cars.push(mkCar(x, y, Math.atan2(tg.y - y, tg.x - x), '#fff', 'c'));
-        }
+          msg('🚨 계엄령 선포: 군대가 출동했습니다!');
+        } else cars.push(mkCar(x, y, ang, '#fff', 'c'));
         return;
       }
     }
@@ -2073,23 +2093,29 @@
 
     const tg = P.onFoot ? P : P.car, stars = Math.min(5, Math.ceil(heat - 1e-6));
     robUpd(dt, tg);
+    if (robbing && !robbing.al && robbing.t > 2.5) { robbing.al = 1; alarmCall(tg, Math.max(1, stars)); }
+    if (heat <= 0 || (called && T - seenT > 14)) { called = false; heliMsg = 0; }   // 14초 동안 아무도 나를 못 봤으면 수색 모드로 돌아가요
     for (const c of cars) {
       if (c.type === 't') tUpd(c, dt);
       else if (c.type === 'c') {
         if (c.stun > 0) { c.stun -= dt; c.v *= 0.95; } 
         else {
-          if (c.kind === 'heli') fly(c, 1, Math.sign(angN(Math.atan2(tg.y - c.y, tg.x - c.x) - c.a)), dt);
+          if (c.pat) {   // 순찰 중: 평소엔 도로를 돌다가, 수배 중이면 내 쪽으로 수색 · 시야(420) 안에서 발견하면 지원 요청
+            c.seek = stars > 0 && !called ? tg : null; c.sp = c.seek ? 215 : 135; tUpd(c, dt);
+            if (stars > 0 && !activeInterior && !MP.hall() && Math.hypot(tg.x - c.x, tg.y - c.y) < ((tg.z || 0) > 40 ? 300 : 420)) callIn(c, tg, stars);
+          }
+          else if (c.kind === 'heli') fly(c, 1, Math.sign(angN(Math.atan2(tg.y - c.y, tg.x - c.x) - c.a)), dt);
           else pUpd(c, dt, tg, stars);
           
           // 4성 이상 군대 병력 자동 사격 및 공격
-          if (stars >= 4 && c.gun && Math.hypot(tg.x - c.x, tg.y - c.y) < 700) {
+          if (!c.pat && stars >= 4 && c.gun && Math.hypot(tg.x - c.x, tg.y - c.y) < 700) {
             vFire(c);
           }
         }
       }
     }
 
-    if (P.onFoot && stars > 0) for (const c of cars) if (c.type === 'c' && !c.off && offs.length < 3 && Math.hypot(c.x - P.x, c.y - P.y) < 230 && Math.abs(c.v) < 200) { c.off = 1; c.stun = Math.max(c.stun || 0, 5); spawnOff(c); }
+    if (P.onFoot && stars > 0) for (const c of cars) if (c.type === 'c' && !c.pat && !c.off && offs.length < 3 && Math.hypot(c.x - P.x, c.y - P.y) < 230 && Math.abs(c.v) < 200) { c.off = 1; c.stun = Math.max(c.stun || 0, 5); spawnOff(c); }
 
     for (let i = offs.length - 1; i >= 0; i--) {
       const o = offs[i];
@@ -2168,25 +2194,32 @@
     let near = false, close = false, police = 0;
     for (let i = cars.length - 1; i >= 0; i--) {
       const c = cars[i];
-      if (c.type === 'c') {
+      if (c.type === 'c' && c.pat) { if (Math.hypot(c.x - tg.x, c.y - tg.y) > 2000) cars.splice(i, 1); }
+      else if (c.type === 'c') {
         police++; const d = Math.hypot(c.x - tg.x, c.y - tg.y);
+        if (d < 450) seenT = T;
         if (d < 40 && (tg.z || 0) < 20) near = true; if (d < 400) close = true;
         if (d > 1500 || (heat <= 0 && d > 650)) cars.splice(i, 1);
       } else if (c.type === 't' && Math.hypot(c.x - tg.x, c.y - tg.y) > 1600) cars.splice(i, 1);
     }
     if (!MP.hall() && cars.filter(c => c.type === 't').length < 40) spawnT(true);   // 홀(로비·경매장)에서는 도시 차량을 새로 만들지 않음
 
-    const rdOn = MP.raid(), want = rdOn ? MP.raidWant() : [0, 1, 2, 3, 5, 7][stars]; pt -= dt;
-    if (police < want && pt <= 0) { spawnPolice(); pt = rdOn ? 0.45 : 1.2; }
+    const rdOn = MP.raid(), want = rdOn ? MP.raidWant() : wantCars(stars) + wantHeli(stars), hw = rdOn ? Math.round(want * 0.3) : wantHeli(stars); pt -= dt; patT -= dt;
+    // 증원은 '발견됐을 때'만 (레이드는 전 경찰 비상이라 항상). 안 들켰으면 순찰차가 수색하러 올 때까지 기다려요
+    const callActive = rdOn || (called && T - seenT < 14);
+    if (police < want && pt <= 0 && callActive) { spawnPolice(hw); pt = rdOn ? 0.45 : 1.5; }
+    let patN = 0; for (const c of cars) if (c.pat) patN++;
+    if (!MP.hall() && patN < 8 && patT <= 0) { spawnPatrol(); patT = 1.2; }
     if (!close && heat > 0) heat = Math.max(0, heat - 0.07 * dt);
     const sp = P.onFoot ? 0 : Math.abs(P.car.v);
 
     if (baseP && !baseSeen && Math.hypot(tg.x - baseP.x, tg.y - baseP.y) < 300) { baseSeen = 1; msg('군사기지 발견! 탱크·장갑차에 탈 수 있어요'); }
     for (const o of offs) if (o.dead <= 0 && (tg.z || 0) < 20 && Math.hypot(o.x - tg.x, o.y - tg.y) < 27) near = true;
-    if (MP.raid() && (tg.z || 0) < 20) for (const c of cars) if (c.type === 'c' && c.kind === 'heli' && Math.hypot(c.x - tg.x, c.y - tg.y) < 70) { near = true; break; }   // 경찰 헬기가 머리 위로 오면 체포 게이지가 차올라요
+    let airLock = false;   // 경찰 헬기가 가까이 오면 공중(제트팩)에서도 조준을 당해 체포 게이지가 차올라요
+    if (MP.raid() || stars >= 3) for (const c of cars) if (c.type === 'c' && !c.pat && c.kind === 'heli' && Math.hypot(c.x - tg.x, c.y - tg.y) < 130) { airLock = true; break; }
 
     if (tased > 0 && stars > 0) bust = Math.min(1.69, bust + dt * 0.5);
-    if (near && sp < 100 && stars > 0) bust += dt * 1.3; else bust = Math.max(0, bust - dt * 1.5);
+    if (near && sp < 100 && stars > 0) bust += dt * 1.3; else if (airLock && stars > 0) bust += dt * 0.7; else bust = Math.max(0, bust - dt * 1.5);
     if (bust > 1.7) busted();
 
     if (!P.onFoot && P.car.hp <= 0) {
@@ -4650,7 +4683,7 @@
       if (raid.wave > r.waves) { raidWin(); return; }
       raid.done = 0; raid.quota = raidQuota(raid.diff, raid.wave, raid.size); raid.ph = 'run'; heat = 5; if (!martial) { martial = true; showMartial(); }
       title(`🚨 WAVE ${raid.wave} / ${r.waves}`, `도둑질 ${raid.quota}번 성공하라! (은행·ATM·상점 아무 데나)`, '#ff5a5a'); playSound('siren');
-      for (let n = 0; n < 3; n++) spawnPolice();
+      seenT = T; called = true; for (let n = 0; n < 3; n++) spawnPolice(1);
     }
     function raidWin() {
       const r = RAID[raid.diff]; raid.ph = 'win'; raid.t = 8; money += r.rw; playSound('cash');
