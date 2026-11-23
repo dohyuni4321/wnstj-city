@@ -305,14 +305,18 @@ function renderEd() {
   for (const [idx, nm] of WEAPONS) {
     const sel = document.createElement('select'); for (let i = 0; i <= 99; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
     sel.value = Number(aOwn.wu[idx]) || 0;
-    const es = document.createElement('select'); es.title = '인첸트 종류'; es.innerHTML = '<option value="-1">인첸트 없음</option>' + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
-    const el = document.createElement('select'); el.title = '인첸트 레벨'; el.innerHTML = '<option>1</option><option>2</option><option>3</option>';
-    const cur = Array.isArray(aOwn.en[idx]) ? (typeof aOwn.en[idx][0] === 'number' ? aOwn.en[idx] : aOwn.en[idx][0]) : null; es.value = cur ? cur[0] : -1; el.value = cur ? cur[1] : 1;
-    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;gap:4px;align-items:center'; ex.append(sel, es, el); if (enList(aOwn.en[idx]).length > 1) { const m = document.createElement('small'); m.textContent = '+ ' + enText(aOwn.en[idx]); m.title = '인첸트 여러 개'; ex.append(m); }
+    const cur = enList(aOwn.en[idx]), pairs = [];
+    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;align-items:center'; ex.append(sel);
+    for (let k = 0; k < 4; k++) {   // 인첸트 4칸 · 안 붙은 칸은 '없음'
+      const es = document.createElement('select'); es.title = '인첸트 ' + (k + 1) + ' 종류'; es.innerHTML = `<option value="-1">인첸트${k + 1} · 없음</option>` + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+      const el = document.createElement('select'); el.title = '인첸트 ' + (k + 1) + ' 레벨'; el.innerHTML = '<option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option>';
+      if (cur[k]) { es.value = cur[k][0]; el.value = cur[k][1]; } else es.value = -1;
+      pairs.push([es, el]); const w = document.createElement('span'); w.style.cssText = 'display:flex;gap:2px'; w.append(es, el); ex.append(w);
+    }
     const [l, cb] = chip(aOwn[idx], nm, ex);
-    const setEn = () => { const t = Number(es.value); if (t >= 0) { aOwn[idx] = 1; { const L = Array.isArray(aOwn.en[idx]) && typeof aOwn.en[idx][0] !== 'number' ? aOwn.en[idx] : null; if (L && L.length) L[0] = [t, Number(el.value) || 1]; else aOwn.en[idx] = [t, Number(el.value) || 1]; } cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
-    es.onchange = setEn; el.onchange = setEn;
-    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; es.value = -1; } l.classList.toggle('on', cb.checked); syncJson(); };
+    const setEn = () => { const L = []; pairs.forEach(([es, el]) => { const t = Number(es.value); if (t >= 0) L.push([t, Number(el.value) || 1]); }); if (L.length) { aOwn[idx] = 1; aOwn.en[idx] = L.length === 1 ? L[0] : L; cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
+    pairs.forEach(([es, el]) => { es.onchange = setEn; el.onchange = setEn; });
+    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; pairs.forEach(([es]) => { es.value = -1; }); } l.classList.toggle('on', cb.checked); syncJson(); };
     sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
     W.appendChild(l);
   }
