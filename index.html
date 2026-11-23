@@ -3047,7 +3047,7 @@
       const tg = P.onFoot ? P : P.car, x = ox + tg.x * s, y = oy + tg.y * s;
       g.save(); g.translate(x, y); g.rotate(tg.a); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(11, 0); g.lineTo(-7, -7); g.lineTo(-3, 0); g.lineTo(-7, 7); g.closePath(); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.stroke(); g.restore();
       g.fillStyle = '#ffd23f'; g.fillText('나', x, y - 16);
-      g.font = 'bold 18px system-ui'; g.fillStyle = '#fff'; g.fillText('🗺  도시 지도 — 친구·웨이포인트 클릭=TP · 내 아이콘 클릭=웨이포인트 저장(최대 3) · 우클릭=안내하기 (M / Esc)', w / 2, Math.max(18, oy - 14));
+      g.font = 'bold 18px system-ui'; g.fillStyle = '#fff'; g.fillText('🗺  도시 지도 — 친구·웨이포인트 클릭=TP · 내 아이콘 클릭=웨이포인트 저장(최대 5) · 우클릭=안내하기 (M / Esc)', w / 2, Math.max(18, oy - 14));
       g.font = '12px system-ui'; g.fillStyle = 'rgba(255,255,255,.75)';
       g.fillText('🪖 군사기지  🧸 뽑기방  🚗 차 가게  ⚒ 무기 강화소  ⛽ 주유소  P 주차장  🏦 은행  💎 보석상  🏪🛒🍺💊📮 털이 가게  ●파랑 경찰', w / 2, Math.min(h - 10, oy + S + 16));
       v4MapTop(g);
@@ -3282,9 +3282,9 @@
       { id: 'ab', ic: '☢️', gs: 1, get n() { return ABN + (own.ab ? ' ×' + own.ab : ''); }, get d() { const g = GS.stock.ab; return '전 서버·모든 방 공용 한정 재고 · 선착순 (' + (!GS.ok ? '재고 확인 중…' : g && g.stock > 0 ? '남은 ' + g.stock + '개' : '품절 · 관리자가 재고를 넣으면 구매 가능') + ') · N키로 설치 → 같은 방 모두에게 박수 연출! PvP 켠 사람·안 켠 사람 모두 돈 10%를 뺏기고 블랙홀에 30초간 끌려가요 (무적 포션 중이면 피해 없음)'; }, get p() { const g = GS.stock.ab; return g ? g.price : 100000000; } },
       { id: 'rail', ic: '⚡', n: '레일건', d: '한 방 350 데미지 · 초고속 탄', p: 45000, w: 7 },
       { id: 'flame', ic: '🌋', n: '화염방사기', d: '100발 불꽃 연사 · 키 0 / 휠로 선택', p: 35000, w: 9 },
-      { id: 'god', ic: '🛡️', n: '무적 포션', d: '30초간 체포·테이저·차량 피해 무효', p: 8000 },
-      { id: 'spd', ic: '💨', n: '스피드 포션', d: '30초간 걷기·달리기 2배', p: 4000 },
-      { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 옥상까지 점프 · 낙하 충격 없음', p: 3000 },
+      { id: 'god', ic: '🛡️', n: '무적 포션', d: '30초간 체포·테이저·차량 피해 무효 · 사면 인벤토리(I)에 보관, 여러 병 마시면 시간이 늘어요', p: 8000 },
+      { id: 'spd', ic: '💨', n: '스피드 포션', d: '30초간 걷기·달리기 2배 · 사면 인벤토리(I)에 보관, 여러 병 마시면 시간이 늘어요', p: 4000 },
+      { id: 'jmp', ic: '🦘', n: '슈퍼 점프 포션', d: '30초간 옥상까지 점프 · 낙하 충격 없음 · 사면 인벤토리(I)에 보관, 여러 병 마시면 시간이 늘어요', p: 3000 },
       { id: 'jp', ic: '🎒', n: '제트팩', d: '공중에서 Space 꾹 → 비행 · 연료 자동 충전 (영구)', p: 300000, perm: 'jp' },
       { id: 'gh', ic: '🪝', n: '그래플링 훅', d: 'C 키: 조준한 건물·벽으로 끌려가기 (영구)', p: 150000, perm: 'gh' },
       { id: 'jpu', ic: '⛽', get n() { return '제트팩 연료 업그레이드 Lv' + (own.jpu || 0) + '/5'; }, get d() { return own.jp ? '연료 용량 ' + jpMax() + ' → ' + (jpMax() + 50) + ' · 충전 속도 증가' : '먼저 제트팩을 구매하세요'; }, get p() { return PRICES.jpu !== undefined ? PRICES.jpu : JPU[Math.min(own.jpu || 0, 4)]; }, mx: () => (own.jpu || 0) >= 5 },
@@ -3383,8 +3383,8 @@
       $('shopMoney').textContent = '💰 $' + Math.round(money).toLocaleString();
       $('shopGr').innerHTML = ITEMS.map(it => {
         const gsd = it.gs ? GS.stock[it.id] : null, so = !!it.gs && (!gsd || gsd.stock <= 0);
-        const ow = (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && (so || money < it.p), hv = it.w && own[it.w] ? invCount(it.w) + 1 : 0;
-        return `<div class="it${ow ? ' own' : no ? ' no' : ''}${it.gold ? ' gold' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}${hv ? ` <small style="color:#3f6">보유 ×${hv}</small>` : ''}</div><div class="ds">${it.d}${hv ? '<br><b style="color:#3f6">✔ 또 사면 인벤토리(I)에 보관돼요</b>' : ''}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : it.tg ? it.tg() : '보유 중') : so ? '품절' : (it.gs ? '남은 ' + gsd.stock + '개<br>' : '') + '$' + it.p.toLocaleString()}</div></div>`;
+        const ow = (it.perm && own[it.perm]) || (it.mx && it.mx()), no = !ow && (so || money < it.p), hv = it.w && own[it.w] ? invCount(it.w) + 1 : 0, pn = POT[it.id] ? potN(it.id) : 0;
+        return `<div class="it${ow ? ' own' : no ? ' no' : ''}${it.gold ? ' gold' : ''}" data-id="${it.id}"><div class="ic">${it.ic}</div><div><div class="nm">${it.n}${hv ? ` <small style="color:#3f6">보유 ×${hv}</small>` : ''}${POT[it.id] ? ` <small style="color:#7fe7ff">보유 ${pn}병</small>` : ''}</div><div class="ds">${it.d}${hv ? '<br><b style="color:#3f6">✔ 또 사면 인벤토리(I)에 보관돼요</b>' : ''}${it.w && WP[it.w].tip ? "<br><b style=\"color:#ffb347\">✦ " + WP[it.w].tip + "</b>" : ""}</div></div><div class="pr">${ow ? (it.mx ? 'MAX' : it.tg ? it.tg() : '보유 중') : so ? '품절' : (it.gs ? '남은 ' + gsd.stock + '개<br>' : '') + '$' + it.p.toLocaleString()}</div></div>`;
       }).join('');
     }
     shopEl.addEventListener('click', e => { const t = e.target.closest('.it'); if (t) buy(t.dataset.id); });
@@ -3415,9 +3415,7 @@
       if (it.w && own[it.w]) { invPush(it.w, 0, null); saveOwn(); event(`님이 ${it.n}을(를) 또 샀습니다!`); msg(`🎒 이미 갖고 있어서 ${it.n}을(를) 인벤토리에 넣었어요 · I 키로 핫바에 장착`); }
       else if (it.w) { own[it.w] = 1; LS.set('cc_own', JSON.stringify(own)); am[it.w] = WP[it.w].mag; if (P.onFoot) { wi = it.w; rel = 0; scope = false; } event(`님이 ${it.n}을(를) 샀습니다!`); }
       else if (it.perm) { own[it.perm] = 1; if (it.perm === 'pvp') { own.pvpOn = 1; php = 100; } LS.set('cc_own', JSON.stringify(own)); event(`님이 ${it.n}을(를) 샀습니다!`); msg(it.perm === 'gh' ? '🪝 그래플링 훅 획득! 건물을 조준하고 C' : it.perm === 'pvp' ? '⚔️ PvP 켜짐! 상점에서 언제든 켜고 끌 수 있어요' : it.perm === 'jp' ? '🎒 제트팩 장착! 점프 후 Space를 꾹 누르면 날아요' : '✅ ' + it.n + ' 획득!'); }
-      else if (id === 'god') { god = 30; event('님이 무적 포션을 마셨습니다 (30초)'); }
-      else if (id === 'spd') spdT = 30;
-      else if (id === 'jmp') jumpT = 30;
+      else if (POT[id]) { potAdd(id, 1); saveOwn(); msg(`🎒 ${POT[id].n} 1병이 인벤토리에 들어갔어요 · I 키 → 클릭해서 마시기 (보유 ${potN(id)}병)`); renderShop(); return; }
       else if (id === 'gren') gren += 5;
       else if (id === 'tnt') tnt += 3;
       else if (id === 'ammo') { for (let i = 0; i < WP.length; i++) am[i] = WP[i].mag; rel = 0; }
@@ -3741,6 +3739,16 @@
     }
     // v21 인벤토리: 같은 무기를 또 얻으면 own.inv 에 보관 · 핫바(own[무기번호])에는 무기 종류당 1자루만 장착
     const INV_MAX = 80;
+    // 물약: 상점에서 사면 인벤토리(own.pot)에 보관 → 인벤토리(I)에서 클릭해 마시기 · 여러 병을 마시면 시간이 계속 늘어나요
+    const POT = { god: { ic: '🛡️', n: '무적 포션', s: 30 }, spd: { ic: '💨', n: '스피드 포션', s: 30 }, jmp: { ic: '🦘', n: '슈퍼 점프 포션', s: 30 } };
+    const potN = k => Math.max(0, (own.pot && own.pot[k]) | 0);
+    function potAdd(k, n) { own.pot = own.pot || {}; own.pot[k] = Math.min(999, potN(k) + n); }
+    function potDrink(k) {
+      if (!POT[k] || potN(k) < 1) return; own.pot[k] = potN(k) - 1; const s = POT[k].s;
+      if (k === 'god') god += s; else if (k === 'spd') spdT += s; else if (k === 'jmp') jumpT += s;
+      const left = k === 'god' ? god : k === 'spd' ? spdT : jumpT;
+      saveOwn(); playSound('cash'); ivNote = `${POT[k].ic} ${POT[k].n} 마심 · 남은 시간 ${Math.ceil(left)}초`; msg(ivNote); if (k === 'god') event('님이 무적 포션을 마셨습니다'); renderInv();
+    }
     // 인첸트 저장 형태: [종류,레벨] (일반) 또는 [[종류,레벨],[종류,레벨],...] (관리자 경매 · 최대 4개 · 같은 인첸트 중복도 가능)
     const enNorm = x => { if (!Array.isArray(x)) return []; const a = typeof x[0] === 'number' ? [x] : x; return a.filter(p => Array.isArray(p) && ENCH[p[0] | 0]).slice(0, 4).map(p => [p[0] | 0, Math.max(1, Math.min(3, p[1] | 0))]); };
     const enStr = x => enNorm(x).map(p => `${ENCH[p[0]].ic}${esc(ENCH[p[0]].n)} Lv${p[1]}`).join(' + ');
@@ -4113,7 +4121,7 @@
     let mapMenu = null;
     const wpPos = i => { const w = own.wp[i]; return mapGeo ? [mapGeo.ox + w.x * mapGeo.s, mapGeo.oy + w.y * mapGeo.s] : [-999, -999]; };
     function openWpIn() {
-      if (own.wp.length >= 3) { msg('웨이포인트는 최대 3개예요 · 우클릭 → 삭제 후 다시 저장'); return; }
+      if (own.wp.length >= 5) { msg('웨이포인트는 최대 5개예요 · 우클릭 → 삭제 후 다시 저장'); return; }
       wpBusy = true; if (document.pointerLockElement) document.exitPointerLock();
       wpEl.style.display = 'block'; wpName.value = ''; setTimeout(() => wpName.focus(), 30);
     }
@@ -4121,7 +4129,7 @@
     function saveWp(name) {
       const o = P.onFoot ? P : P.car;
       own.wp.push({ n: (name || '').trim() || ('장소 ' + (own.wp.length + 1)), x: Math.round(o.x), y: Math.round(o.y), z: P.onFoot ? Math.round(P.z) : 0, roof: P.onFoot && P.roof ? 1 : 0 });
-      saveOwn(); closeWpIn(); msg(`📍 웨이포인트 저장: ${own.wp[own.wp.length - 1].n} (${own.wp.length}/3)`); playSound('cash');
+      saveOwn(); closeWpIn(); msg(`📍 웨이포인트 저장: ${own.wp[own.wp.length - 1].n} (${own.wp.length}/5)`); playSound('cash');
     }
     function tpPoint(w) {
       if (activeInterior) { msg('건물 안에서는 TP 할 수 없습니다'); return; }
@@ -4278,7 +4286,9 @@
     const ivName = (w, lv, en) => { const e = enStr(en); return `⚔️ ${esc(WP[w].n)}${lv ? ` <b style="color:#ffb347">+${lv}</b>` : ''}${e ? ' · ' + e : ''}`; };
     function renderInv() {
       const inv = invList(); $('ivN').textContent = `보관 ${inv.length} / ${INV_MAX}`; $('ivRes').textContent = ivNote; $('ivRes').style.color = '#4cd98a';
-      let h = '<div class="sec">🎯 핫바에 장착 중</div>', any = false;
+      let h = '<div class="sec">🧪 물약 (클릭해서 마시기 · 여러 병 마시면 시간이 늘어요)</div>';
+      h += Object.keys(POT).map(k => { const n = potN(k), cur = k === 'god' ? god : k === 'spd' ? spdT : jumpT; return `<div class="row"><div class="nm">${POT[k].ic} ${POT[k].n} <b style="color:#7fe7ff">×${n}</b><div class="ds">1병 = +${POT[k].s}초${cur > 0 ? ` · 지금 효과 ${Math.ceil(cur)}초 남음` : ''}</div></div><div class="btn${n ? '' : ' dis'}" data-pot="${k}">${n ? '마시기' : '없음'}</div></div>`; }).join('');
+      h += '<div class="sec">🎯 핫바에 장착 중</div>'; let any = false;
       for (let i = 6; i < WP.length; i++) if (own[i]) { any = true; h += `<div class="row"><div class="nm">${ivName(i, wlv(i), own.en && own.en[i])}</div><div class="pr" style="color:#4cd98a">장착 중</div></div>`; }
       if (!any) h += '<div style="padding:8px;color:#8b95a8;font-size:13px">장착한 특수 무기가 없어요 (기본 무기 1~6번은 항상 쓸 수 있어요)</div>';
       h += '<div class="sec">🎒 보관 중</div>';
@@ -4295,7 +4305,7 @@
       if (am[w] === undefined || am[w] > WP[w].mag) am[w] = WP[w].mag;
       invClean(); saveOwn(); playSound('click'); ivNote = `✅ ${WP[w].n} +${it.lv} 장착 완료` + (cur ? ' · 이전 무기는 인벤토리로' : ''); msg(ivNote); renderInv();
     }
-    invEl.addEventListener('click', e => { const t = e.target.closest('[data-eq]'); if (t) invEquip(+t.dataset.eq); });
+    invEl.addEventListener('click', e => { const p = e.target.closest('[data-pot]'); if (p) { potDrink(p.dataset.pot); return; } const t = e.target.closest('[data-eq]'); if (t) invEquip(+t.dataset.eq); });
     function toggleInv() { if (panel === 'inv') closePanel(); else { ivNote = ''; openPanel('inv'); } }
 
     // ---------------------------------------------------------------- v21 🏛 홀: 로비(방 코드 LLLLL) · 경매장(방 코드 UUUUU)
