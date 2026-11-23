@@ -1915,7 +1915,7 @@
   function pUpd(c, dt, tg, stars) {
     const da = angN(Math.atan2(tg.y - c.y, tg.x - c.x) - c.a); let sg = Math.max(-1, Math.min(1, da * 2.5));
     if (Math.abs(da) > 2.4) { c.ts = c.ts || (da > 0 ? 1 : -1); sg = c.ts; } else c.ts = 0;
-    drive(c, 1, sg, dt, 290 + stars * 15);
+    drive(c, 1, sg, dt, (290 + stars * 15) * (c.spd || 1));
     if (Math.abs(c.v) < 20) c.stuck += dt; else c.stuck = 0;
     if (c.stuck > 1.2) { c.a += Math.PI * (Math.random() < 0.5 ? 0.7 : -0.7); c.stuck = 0; }
   }
@@ -1977,11 +1977,12 @@
     let best = null, bd = 2200; for (const o of cars) if (o.type === 'c' && o.pat) { const d = Math.hypot(o.x - tg.x, o.y - tg.y); if (d < bd) { bd = d; best = o; } }
     if (best) callIn(best, tg, stars);
   }
-  function spawnPolice(hw) {
+  function spawnPolice(hw, tk) {
     const tg = P.onFoot ? P : P.car;
     const stars = Math.min(5, Math.ceil(heat - 1e-6));
     let heliN = 0; for (const c of cars) if (c.type === 'c' && !c.pat && c.kind === 'heli') heliN++;
-    const needHeli = heliN < (hw || 0);
+    let tankN = 0; for (const c of cars) if (c.type === 'c' && !c.pat && c.kind === 'tank') tankN++;
+    const needHeli = heliN < (hw || 0), needTank = !needHeli && tankN < (tk || 0), spd = MP.raidSpeed();
     for (let n = 0; n < 40; n++) {
       const k = Math.floor(rnd(1, N)), t = rnd(B, W - B), h = Math.random() < 0.5, x = h ? t : k * B, y = h ? k * B : t, d = Math.hypot(x - tg.x, y - tg.y), lo = n < 25 ? 900 : 600, hi = n < 25 ? 1400 : 1000;
       if (d > lo && d < hi) {
@@ -1990,12 +1991,15 @@
           const m = stars >= 4 || MP.raid();
           cars.push(Object.assign(mkCar(x, y, ang, '#fff', 'c'), VK.heli, m ? { z: 40, mil: 1, kn: '군용 공격 헬기', hp: 220, mhp: 220 } : { z: 30, mil: 1, kn: '🚁 경찰 헬기', hp: 160, mhp: 160 }));
           if (m && !martial) { martial = true; showMartial(); MP.martial(); }
+        } else if (needTank) {
+          cars.push(Object.assign(mkCar(x, y, ang, '#fff', 'c'), VK.tank, { kn: '군용 탱크' })); if (!martial) { martial = true; showMartial(); MP.martial(); }
         } else if (mil && Math.random() < 0.5) {
           const mType = Math.random();   // 4성 이상: 군대 (장갑차·탱크)
           cars.push(Object.assign(mkCar(x, y, ang, '#fff', 'c'), mType < 0.6 ? VK.apc : VK.tank, { kn: mType < 0.6 ? '군용 장갑차' : '군용 탱크' }));
           if (!martial) { martial = true; showMartial(); MP.martial(); }
           msg('🚨 계엄령 선포: 군대가 출동했습니다!');
         } else cars.push(mkCar(x, y, ang, '#fff', 'c'));
+        if (spd !== 1) { const nc = cars[cars.length - 1]; if (nc.max) nc.max *= spd; nc.spd = spd; }   // 레이드/이벤트 경찰 속도 배율
         return;
       }
     }
@@ -2222,7 +2226,7 @@
     const rdOn = MP.raid(), want = rdOn ? MP.raidWant() : wantCars(stars) + wantHeli(stars), hw = rdOn ? MP.raidHeli() : wantHeli(stars); pt -= dt; patT -= dt;
     // 증원은 '발견됐을 때'만 (레이드는 전 경찰 비상이라 항상). 안 들켰으면 순찰차가 수색하러 올 때까지 기다려요
     const callActive = rdOn || (called && T - seenT < 14);
-    if (police < want && pt <= 0 && callActive) { spawnPolice(hw); pt = rdOn ? 0.45 : 1.5; }
+    if (police < want && pt <= 0 && callActive) { spawnPolice(hw, rdOn ? MP.raidTank() : 0); pt = rdOn ? 0.45 : 1.5; }
     let patN = 0; for (const c of cars) if (c.pat) patN++;
     if (!MP.hall() && patN < 8 && patT <= 0) { spawnPatrol(); patT = 1.2; }
     if (!close && heat > 0) heat = Math.max(0, heat - 0.07 * dt);
@@ -4438,6 +4442,7 @@
       }
     }
     function hallEnter(k) {
+      if (k === 'L') raidFetch();
       if (hall === k) return;
       hallBuild();
       if (!hallBack) { const o = P.onFoot ? P : (P.car || P); hallBack = { x: o.x, y: o.y }; }
@@ -4609,8 +4614,19 @@
       { n: '지옥', ic: '🔴', waves: 5, cars: 12, heli: 4, tr: 3, rw: 6000000 }
     ];
     const RAID_POL = [10, 20, 30, 40, 50], RAID_STEAL = [1, 2, 2, 3, 3];
-    const raidTotal = (d, w, size) => Math.ceil(RAID_POL[Math.min(4, w - 1)] * (1 + 0.5 * (size - 1)));
-    const raidSteal = w => RAID_STEAL[Math.min(4, w - 1)];
+    const raidTotal = (d, w, size, ev) => ev ? Math.ceil(ev.pol * (1 + 0.5 * (size - 1))) : Math.ceil(RAID_POL[Math.min(4, w - 1)] * (1 + 0.5 * (size - 1)));
+    const raidSteal = (w, ev) => ev ? ev.steal | 0 : RAID_STEAL[Math.min(4, w - 1)];
+    const RSPD = [1, 1.1, 1.2];
+    // 관리자 패널에서 정한 레이드 보상 / 이벤트 레이드 (서버에서 받아와요)
+    let raidInfo = null, raidSkew = 0, raidInfoT = 0, raidInfoV = 0;
+    async function raidFetch() { raidInfoT = Date.now(); try { const { data } = await sb.rpc('cc_raid_info'); if (data && data.rewards) { raidInfo = data; raidSkew = data.now * 1000 - Date.now(); raidInfoV++; } } catch (e) {} }
+    const srvNow = () => (Date.now() + raidSkew) / 1000;
+    const evById = id => raidInfo && raidInfo.events ? raidInfo.events.find(e => e.id === id) || null : null;
+    const evState = e => { const n = srvNow(); if (e.winner) return 'won'; if (n < e.start) return 'wait'; if (e.end && n > e.end) return 'end'; return 'open'; };
+    const fmtDur = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60; return (h ? h + '시간 ' : '') + (h || m ? m + '분 ' : '') + s2 + '초'; };
+    const fmtRew = rw => { if (!rw) return '–'; const a = []; if (rw.money) a.push('$' + fmt(rw.money).replace('$', '')); if (rw.gren) a.push('💣×' + rw.gren); if (rw.tnt) a.push('🧨×' + rw.tnt); if (rw.ab) a.push('☢️×' + rw.ab); for (const x of rw.weapons || []) if (WP[x.w]) a.push('⚔️' + WP[x.w].n + (x.lv ? '+' + x.lv : '')); return a.join(' · ') || '–'; };
+    const rcf = () => raid.ev ? { waves: 1, cars: raid.ev.cars | 0, heli: raid.ev.heli | 0, tank: raid.ev.tank | 0, tr: 1, trHeli: raid.ev.heli > 0 ? 1 : 0, spd: +raid.ev.speed || 1 }
+      : { waves: RAID[raid.diff].waves, cars: RAID[raid.diff].cars, heli: RAID[raid.diff].heli, tank: 0, tr: RAID[raid.diff].tr, trHeli: raid.diff > 0 ? 1 : 0, spd: RSPD[raid.diff] };
     const isRaid = c => c.length === 6 && c.startsWith('RI');
     let raid = null, pendRaid = null, raidSyncT = 0, raidSaveT = 0;
     function lobPad() { const q = HALLS.L; return { x: q.x, y: q.y - 60, r: 120 }; }
@@ -4621,11 +4637,12 @@
       #lobBox .sz{display:flex;gap:6px}#lobBox .sz .o{flex:1;text-align:center;margin:0}#lobBox .inf{margin-top:10px;font-weight:800;text-align:center;min-height:36px}`; document.head.appendChild(st); }
     document.body.appendChild(lobBox);
     for (const ev of ['mousedown', 'mouseup', 'click', 'touchstart']) lobBox.addEventListener(ev, e => e.stopPropagation());
-    const lobMine = { diff: 0, size: 1 }; let lobCfg = null, lobLead = false, lobGo = null, lobSendT = 0, lobSig = '', lobWas = false;
+    const lobMine = { diff: 0, size: 1, ev: 0 }; let lobCfg = null, lobLead = false, lobGo = null, lobSendT = 0, lobSig = '', lobWas = false;
     lobBox.addEventListener('click', e => {
-      const t = e.target.closest('[data-d],[data-s]'); if (!t || !lobLead) return;
-      if (t.dataset.d !== undefined) lobMine.diff = +t.dataset.d; if (t.dataset.s !== undefined) lobMine.size = +t.dataset.s;
-      lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, t: performance.now() }; lobSendT = 0; lobSig = '';
+      const t = e.target.closest('[data-d],[data-s],[data-e]'); if (!t || !lobLead) return;
+      if (t.dataset.d !== undefined) { lobMine.diff = +t.dataset.d; lobMine.ev = 0; } if (t.dataset.s !== undefined) lobMine.size = +t.dataset.s;
+      if (t.dataset.e !== undefined) { const ev = evById(+t.dataset.e); if (ev && evState(ev) === 'open') lobMine.ev = ev.id; }
+      lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, ev: lobMine.ev, t: performance.now() }; lobSendT = 0; lobSig = '';
     });
     function lobOn() {
       const p = lobPad(), r = p.r - 6, a = [];
@@ -4637,9 +4654,9 @@
       if (hall !== 'L') return;
       if (d.k === 'cfg') {
         if (lobLead && d.id < myId) lobLead = false;
-        if (!lobLead) lobCfg = { id: d.id, name: d.name, diff: d.diff | 0, size: Math.max(1, Math.min(4, d.size | 0)), t: performance.now() };
+        if (!lobLead) lobCfg = { id: d.id, name: d.name, diff: d.diff | 0, size: Math.max(1, Math.min(4, d.size | 0)), ev: d.ev | 0, t: performance.now() };
       } else if (d.k === 'go') {
-        if (lobCfg && d.id === lobCfg.id && isRaid(String(d.code))) lobGo = { code: String(d.code), diff: Math.max(0, Math.min(2, d.diff | 0)), size: Math.max(1, Math.min(4, d.size | 0)), at: performance.now() + 3000 };
+        if (lobCfg && d.id === lobCfg.id && isRaid(String(d.code))) lobGo = { code: String(d.code), diff: Math.max(0, Math.min(2, d.diff | 0)), size: Math.max(1, Math.min(4, d.size | 0)), ev: d.ev | 0, at: performance.now() + 3000 };
       } else if (d.k === 'abort') { if (lobCfg && d.id === lobCfg.id) lobGo = null; }
     }
     function lobNear() { return null; }
@@ -4650,23 +4667,29 @@
         lobLead = false; lobGo = null; lobWas = false; if (lobBox.style.display !== 'none') lobBox.style.display = 'none'; return;
       }
       if (!lobWas) { lobWas = true; lobSig = ''; if (document.pointerLockElement) document.exitPointerLock(); }
-      if (!lobCfg || now - lobCfg.t > 4000 || !on.some(p => p.id === lobCfg.id)) { lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, t: now }; lobLead = true; lobSendT = 0; }
-      if (lobLead) { lobCfg.t = now; if (now - lobSendT > 1500) { lobSendT = now; send('lob', { k: 'cfg', diff: lobCfg.diff, size: lobCfg.size }); } }
+      if (Date.now() - raidInfoT > 20000) raidFetch();
+      if (!lobCfg || now - lobCfg.t > 4000 || !on.some(p => p.id === lobCfg.id)) { lobCfg = { id: myId, name: myName, diff: lobMine.diff, size: lobMine.size, ev: lobMine.ev, t: now }; lobLead = true; lobSendT = 0; }
+      if (lobLead) { lobCfg.t = now; if (now - lobSendT > 1500) { lobSendT = now; send('lob', { k: 'cfg', diff: lobCfg.diff, size: lobCfg.size, ev: lobCfg.ev | 0 }); } }
       const full = on.length === lobCfg.size;
       if (lobLead) {
-        if (full && !lobGo) { const code = 'RI' + rc(4); lobGo = { code, diff: lobCfg.diff, size: lobCfg.size, at: now + 3000 }; send('lob', { k: 'go', code, diff: lobCfg.diff, size: lobCfg.size }); }
+        const evO = lobCfg.ev ? evById(lobCfg.ev) : null, evOk = !lobCfg.ev || (evO && evState(evO) === 'open');
+        if (full && evOk && !lobGo) { const code = 'RI' + rc(4); lobGo = { code, diff: lobCfg.diff, size: lobCfg.size, ev: lobCfg.ev | 0, at: now + 3000 }; send('lob', { k: 'go', code, diff: lobCfg.diff, size: lobCfg.size, ev: lobCfg.ev | 0 }); }
         else if (!full && lobGo) { lobGo = null; send('lob', { k: 'abort' }); }
       }
       if (lobGo) {
         if (on.length !== lobGo.size) lobGo = null;
-        else if (now >= lobGo.at) { const g = lobGo; lobGo = null; lobBox.style.display = 'none'; lobWas = false; pendRaid = { code: g.code, diff: g.diff, size: g.size }; go(g.code); return; }
+        else if (now >= lobGo.at) { const g = lobGo; lobGo = null; lobBox.style.display = 'none'; lobWas = false; pendRaid = { code: g.code, diff: g.diff, size: g.size, ev: g.ev ? evById(g.ev) : null }; go(g.code); return; }
       }
       const cd = lobGo ? Math.max(1, Math.ceil((lobGo.at - now) / 1000)) : 0;
-      const sig = [lobCfg.id, lobCfg.diff, lobCfg.size, on.length, cd, lobLead].join('|');
+      const sig = [lobCfg.id, lobCfg.diff, lobCfg.size, lobCfg.ev | 0, on.length, cd, lobLead, raidInfoV, Math.floor(Date.now() / 4000)].join('|');
       if (sig !== lobSig) {
         lobSig = sig; lobBox.className = lobLead ? '' : 'mem';
         lobBox.innerHTML = `<b class="t">🚔 경찰 레이드</b><div style="color:#9fb3c8">${lobLead ? '내가 방장 · 난이도와 인원을 정하세요' : '방장 ' + esc(lobCfg.name) + ' 님이 정한 설정이에요'}</div><div class="sec">난이도</div>`
-          + RAID.map((r, i) => `<div class="o${lobCfg.diff === i ? ' on' : ''}" data-d="${i}">${r.ic} <b>${r.n}</b> · ${r.waves}웨이브<br><small style="color:#9fb3c8">보상 ${fmt(r.rw)} · 동시 경찰차 ${r.cars}+헬기 ${r.heli}</small></div>`).join('')
+          + RAID.map((r, i) => `<div class="o${!lobCfg.ev && lobCfg.diff === i ? ' on' : ''}" data-d="${i}">${r.ic} <b>${r.n}</b> · ${r.waves}웨이브<br><small style="color:#9fb3c8">동시 경찰차 ${r.cars}+헬기 ${r.heli}<br>🎁 ${esc(fmtRew(raidInfo && raidInfo.rewards && raidInfo.rewards[i] ? raidInfo.rewards[i].reward : { money: r.rw }))}</small></div>`).join('')
+          + ((raidInfo && raidInfo.events && raidInfo.events.length) ? '<div class="sec">🎉 이벤트 레이드 (선착순 1명 보상)</div>' + raidInfo.events.map(ev => {
+            const st = evState(ev), n = srvNow(), lab = st === 'won' ? `🏆 우승 ${esc(ev.winner)}` : st === 'wait' ? `⏳ ${fmtDur(ev.start - n)} 뒤 오픈` : st === 'end' ? '⌛ 종료' : `🟢 진행 중${ev.end ? ' · ' + fmtDur(ev.end - n) + ' 남음' : ''}`;
+            return `<div class="o${lobCfg.ev === ev.id ? ' on' : ''}" ${st === 'open' ? `data-e="${ev.id}"` : 'style="opacity:.55;cursor:default"'}>🎉 <b>${esc(ev.name)}</b><br><small style="color:#ffd23f">${lab}</small><br><small style="color:#9fb3c8">경찰 ${ev.pol}명 · 차 ${ev.cars}+헬기 ${ev.heli}${ev.tank ? '+탱크 ' + ev.tank : ''} · 속도 ×${ev.speed} · 훔치기 ${ev.steal}번<br>🎁 ${esc(fmtRew(ev.reward))}</small></div>`;
+          }).join('') : '')
           + `<div class="sec">입장 인원 (정확히 이 인원이 발판 위에 서야 시작)</div><div class="sz">${[1, 2, 3, 4].map(n => `<div class="o${lobCfg.size === n ? ' on' : ''}" data-s="${n}">${n}명</div>`).join('')}</div>`
           + `<div class="inf" style="color:${cd ? '#ffd23f' : on.length === lobCfg.size ? '#4cd98a' : '#9fb3c8'}">${cd ? `⏱ ${cd}초 뒤 출발!` : `발판 위 ${on.length} / ${lobCfg.size}명` + (on.length > lobCfg.size ? '<br>인원 초과 · 한 명이 내려가요' : '')}</div>`;
         lobBox.style.display = 'block';
@@ -4675,46 +4698,93 @@
     function raidStart(code) {
       const pr = pendRaid && pendRaid.code === code ? pendRaid : { diff: 0, size: 1 }; pendRaid = null;
       if (raid && raid.code === code) { addFeed('🔄 레이드 방으로 다시 돌아왔어요 · 진행 상황 유지', '#7fd'); return; }   // 자동 재접속: 웨이브 처음부터 다시 시작하지 않기
-      raid = { code, diff: pr.diff, size: pr.size, wave: 0, done: 0, quota: 0, kills: 0, total: 0, ph: 'intro', t: 6 };
-      if (pr.res) { raid.wave = pr.res.wave | 0; raid.done = pr.res.done | 0; raid.kills = pr.res.kills | 0; raid.ph = PHN[pr.res.ph] !== undefined && pr.res.ph !== 'win' ? pr.res.ph : 'brk'; raid.t = raid.ph === 'intro' ? 3 : 4; if (raid.wave) { raid.total = raidTotal(raid.diff, raid.wave, raid.size); raid.quota = raidSteal(raid.wave); } if (raid.ph === 'brk' && raid.wave === 0) raid.ph = 'intro'; }
+      raid = { code, diff: pr.diff, size: pr.size, ev: pr.ev || null, wave: 0, done: 0, quota: 0, kills: 0, total: 0, ph: 'intro', t: 6 };
+      if (pr.res) { raid.wave = pr.res.wave | 0; raid.done = pr.res.done | 0; raid.kills = pr.res.kills | 0; raid.ph = PHN[pr.res.ph] !== undefined && pr.res.ph !== 'win' ? pr.res.ph : 'brk'; raid.t = raid.ph === 'intro' ? 3 : 4; if (raid.wave) { raid.total = raidTotal(raid.diff, raid.wave, raid.size, raid.ev); raid.quota = raidSteal(raid.wave, raid.ev); } if (raid.ph === 'brk' && raid.wave === 0) raid.ph = 'intro'; }
       lobBox.style.display = 'none'; lobGo = null; lobLead = false; lobWas = false;
       raidClear();
       let h = 0; for (const c of code) h = (h * 31 + c.charCodeAt(0)) >>> 0;
       const i = 4 + h % (N - 8), j = 4 + ((h >>> 8) % (N - 8));
       P.onFoot = true; P.car = null; P.z = 0; P.roof = null; P.climb = 0; P.x = i * B + rnd(-30, 30); P.y = j * B + 40 + rnd(-30, 30);
       heat = 0; bust = 0;
-      title('🚔 경찰 레이드', `${RAID[raid.diff].ic} ${RAID[raid.diff].n} · ${RAID[raid.diff].waves}웨이브 · 팀 ${raid.size}명 · 6초 뒤 시작`, '#ff5a5a');
-      addFeed(`🚔 레이드 시작! ${RAID[raid.diff].n} (${RAID[raid.diff].waves}웨이브) · 체포되면 탈락이에요`, '#ff8a5a');
+      title(raid.ev ? '🎉 이벤트 레이드' : '🚔 경찰 레이드', raid.ev ? `${raid.ev.name} · 선착순 1명 보상 · 팀 ${raid.size}명 · 6초 뒤 시작` : `${RAID[raid.diff].ic} ${RAID[raid.diff].n} · ${RAID[raid.diff].waves}웨이브 · 팀 ${raid.size}명 · 6초 뒤 시작`, '#ff5a5a');
+      addFeed(raid.ev ? `🎉 이벤트 레이드 [${raid.ev.name}] 시작! 가장 먼저 깨면 보상은 단 1명!` : `🚔 레이드 시작! ${RAID[raid.diff].n} (${RAID[raid.diff].waves}웨이브) · 체포되면 탈락이에요`, '#ff8a5a');
     }
     function raidClear() { for (let i = cars.length - 1; i >= 0; i--) if (cars[i].type === 'c') cars.splice(i, 1); for (const o of offs) sc.remove(o.m); offs.length = 0; }
     function raidStop() { raid = null; raidSave(); raidClear(); heat = 0; bust = 0; martial = false; }
     // 튕겨서(새로고침·접속 끊김) 나갔다면 같은 레이드 방·진행 웨이브로 되돌아오기
-    function raidSave() { try { if (raid && raid.ph !== 'win') localStorage.setItem('cc_raid', JSON.stringify({ code: raid.code, diff: raid.diff, size: raid.size, wave: raid.wave, done: raid.done, kills: raid.kills | 0, ph: raid.ph, at: Date.now() })); else localStorage.removeItem('cc_raid'); } catch (e) {} }
+    function raidSave() { try { if (raid && raid.ph !== 'win') localStorage.setItem('cc_raid', JSON.stringify({ code: raid.code, diff: raid.diff, size: raid.size, wave: raid.wave, done: raid.done, kills: raid.kills | 0, ev: raid.ev || null, ph: raid.ph, at: Date.now() })); else localStorage.removeItem('cc_raid'); } catch (e) {} }
     function raidResume() {
       let d = null; try { d = JSON.parse(localStorage.getItem('cc_raid') || 'null'); } catch (e) {}
       try { localStorage.removeItem('cc_raid'); } catch (e) {}
       if (!d || !isRaid(String(d.code || '')) || Date.now() - d.at > 10 * 60 * 1000 || !RAID[d.diff | 0]) return false;
-      pendRaid = { code: d.code, diff: d.diff | 0, size: Math.max(1, Math.min(4, d.size | 0)), res: d }; addFeed('🚔 튕기기 전 레이드 방으로 다시 들어가요', '#7fd'); go(d.code); return true;
+      pendRaid = { code: d.code, diff: d.diff | 0, size: Math.max(1, Math.min(4, d.size | 0)), ev: d.ev || null, res: d }; addFeed('🚔 튕기기 전 레이드 방으로 다시 들어가요', '#7fd'); go(d.code); return true;
     }
-    function raidWant() { const r = RAID[raid.diff]; return raid.ph === 'run' ? Math.max(0, Math.min(r.cars + r.heli, raid.total - raid.kills)) : raid.ph === 'stl' ? r.tr + (raid.diff > 0 ? 1 : 0) : 0; }
-    function raidHeli() { const r = RAID[raid.diff]; return raid.ph === 'run' ? Math.min(r.heli, Math.max(0, raid.total - raid.kills)) : raid.ph === 'stl' ? (raid.diff > 0 ? 1 : 0) : 0; }
+    function raidWant() { const c = rcf(); return raid.ph === 'run' ? Math.max(0, Math.min(c.cars + c.heli + c.tank, raid.total - raid.kills)) : raid.ph === 'stl' ? c.tr + c.trHeli : 0; }
+    function raidHeli() { const c = rcf(); return raid.ph === 'run' ? Math.min(c.heli, Math.max(0, raid.total - raid.kills)) : raid.ph === 'stl' ? c.trHeli : 0; }
+    function raidTank() { const c = rcf(); return raid.ph === 'run' ? Math.min(c.tank, Math.max(0, raid.total - raid.kills)) : 0; }
+    const raidSpeed = () => raid ? rcf().spd : 1;
     function raidKill() { if (!raid || raid.ph !== 'run' || raid.kills >= raid.total) return; raid.kills++; send('rkill', { n: 1 }); if (raid.kills < raid.total) msg(`🚔 경찰 소탕 ${raid.kills} / ${raid.total}`); }
     function raidRecvKill(d) { if (raid && raid.ph === 'run' && raid.kills < raid.total) raid.kills = Math.min(raid.total, raid.kills + Math.max(1, Math.min(3, d.n | 0))); }
     function raidNext() {
-      raid.wave++; const r = RAID[raid.diff];
+      raid.wave++; const r = rcf();
       if (raid.wave > r.waves) { raidWin(); return; }
-      raid.done = 0; raid.kills = 0; raid.total = raidTotal(raid.diff, raid.wave, raid.size); raid.quota = raidSteal(raid.wave); raid.ph = 'run'; heat = 5; if (!martial) { martial = true; showMartial(); }
-      title(`🚨 WAVE ${raid.wave} / ${r.waves}`, `① 쫓아오는 경찰 ${raid.total}명을 전부 처치 → ② 도둑질 ${raid.quota}번!`, '#ff5a5a'); playSound('siren');
+      raid.done = 0; raid.kills = 0; raid.total = raidTotal(raid.diff, raid.wave, raid.size, raid.ev); raid.quota = raidSteal(raid.wave, raid.ev); raid.ph = 'run'; heat = 5; if (!martial) { martial = true; showMartial(); }
+      title(raid.ev ? `🎉 ${raid.ev.name}` : `🚨 WAVE ${raid.wave} / ${r.waves}`, raid.quota ? `① 쫓아오는 경찰 ${raid.total}명을 전부 처치 → ② 도둑질 ${raid.quota}번!` : `쫓아오는 경찰 ${raid.total}명을 전부 처치하라!`, '#ff5a5a'); playSound('siren');
       seenT = T; called = true; for (let n = 0; n < 3; n++) spawnPolice(1);
+    }
+    function rewLocal(rw) {   // 계정이 없는 게스트용: 이 기기에만 지급
+      money += rw.money | 0; gren += rw.gren | 0; tnt += rw.tnt | 0; if (rw.ab) own.ab = (own.ab | 0) + (rw.ab | 0);
+      for (const x of rw.weapons || []) {
+        if (!WP[x.w] || WP[x.w].off) continue;
+        if (own[x.w]) invPush(x.w, x.lv | 0, x.en || null);
+        else { own[x.w] = 1; own.wu = own.wu || {}; if (x.lv) own.wu[x.w] = x.lv | 0; if (Array.isArray(x.en)) { own.en = own.en || {}; own.en[x.w] = x.en; } am[x.w] = WP[x.w].mag; }
+      }
+      saveOwn();
+    }
+    async function raidClaim(ev, diff) {
+      let res = { ok: false, err: 'net' };
+      try {
+        own.gren = gren; own.tnt = tnt;
+        for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+        await saveProfile(true); for (let i = 0; i < 40 && profBusy; i++) await sleep(50);
+        profBusy = true;
+        try {
+          const { data } = await sb.rpc('cc_raid_claim', { p_name: myName, p_diff: diff, p_event: ev ? ev.id : null }); if (data) res = data;
+          const before = admSeq; await admPoll(true);
+          if (res.ok && admSeq === before) await loadProfile();
+        } finally { profBusy = false; }
+      } catch (e) {}
+      return res;
+    }
+    function raidWin() {
+      const ev = raid.ev, diff = raid.diff, r = RAID[diff]; raid.ph = 'win'; raid.t = 9; playSound('cash');
+      title('🏆 레이드 클리어!', ev ? `${ev.name} · 보상 확인 중…` : `${r.n} 난이도 완료 · 보상 확인 중…`, '#ffd23f');
+      addFeed(ev ? `🏆 이벤트 레이드 [${ev.name}] 클리어!` : `🏆 레이드(${r.n}) 클리어!`, '#ffd23f'); event(ev ? `님이 이벤트 레이드 [${ev.name}]를 클리어했습니다! 🏆` : `님이 경찰 레이드(${r.n})를 클리어했습니다! 🏆`);
+      raidClear(); heat = 0; martial = false;
+      if (raid.claimed) return; raid.claimed = true;
+      raidClaim(ev, diff).then(res => {
+        if (res.ok) {
+          const t = fmtRew(res.reward);
+          if (ev) { title('🎉 선착순 1등!', `${ev.name} 보상 획득 · ${t}`, '#ffd23f'); event(`님이 이벤트 레이드 [${ev.name}] 선착순 1등을 차지했습니다!!! 🥇`); } else title('🎁 클리어 보상', t, '#7bd44a');
+          msg('🎁 ' + t + (res.inv ? ` · 이미 가진 무기 ${res.inv}자루는 인벤토리(I)에 보관` : '') + (res.skipped ? ` · 인벤토리가 가득 차서 ${res.skipped}자루는 못 받았어요` : ''));
+        } else if (res.err === 'taken') { title('😢 선착순 마감', `${ev ? ev.name : ''} · 이미 ${res.winner} 님이 가장 먼저 깼어요`, '#ff8a5a'); msg(`😢 선착순 마감 · 우승 ${res.winner}`); }
+        else if (res.err === 'closed') msg('⌛ 이벤트 시간이 끝나서 보상이 없어요');
+        else if (res.err === 'no_profile') {
+          if (ev) msg('이벤트 보상은 계정이 있어야 받을 수 있어요');
+          else { const rw = raidInfo && raidInfo.rewards && raidInfo.rewards[diff] ? raidInfo.rewards[diff].reward : { money: RAID[diff].rw }; rewLocal(rw); title('🎁 클리어 보상', fmtRew(rw), '#7bd44a'); }
+        } else if (res.err === 'too_fast') msg('보상은 90초에 한 번만 받을 수 있어요');
+        else msg('보상 처리에 실패했어요 (네트워크)');
+      });
     }
     function raidTick(dt) {
       if (!raid) return;
       if (raid.ph === 'intro') { heat = 0; raid.t -= dt; if (raid.t <= 0) raidNext(); }
       else if (raid.ph === 'run') {
         heat = 5; if (!martial) { martial = true; showMartial(); }
-        if (raid.kills >= raid.total) { raid.ph = 'stl'; for (let q = cars.length - 1; q >= 0; q--) if (cars[q].type === 'c' && !cars[q].pat && cars[q] !== P.car) cars.splice(q, 1); title('🔓 경찰 전멸!', `이제 도둑질 ${raid.quota}번! (땅에서 E키 · 증원이 계속 와요)`, '#ffd23f'); playSound('cash'); }
+        if (raid.kills >= raid.total && raid.quota <= 0) { raid.ph = 'brk'; raid.t = 4; for (let q = cars.length - 1; q >= 0; q--) if (cars[q].type === 'c' && !cars[q].pat && cars[q] !== P.car) cars.splice(q, 1); title(`✅ ${raid.ev ? raid.ev.name : 'WAVE ' + raid.wave} 클리어`, '경찰 전멸!', '#7bd44a'); playSound('cash'); }
+        else if (raid.kills >= raid.total) { raid.ph = 'stl'; for (let q = cars.length - 1; q >= 0; q--) if (cars[q].type === 'c' && !cars[q].pat && cars[q] !== P.car) cars.splice(q, 1); title('🔓 경찰 전멸!', `이제 도둑질 ${raid.quota}번! (땅에서 E키 · 증원이 계속 와요)`, '#ffd23f'); playSound('cash'); }
       } else if (raid.ph === 'stl') {
-        heat = 5; if (raid.done >= raid.quota) { raid.ph = 'brk'; raid.t = 6; title(`✅ WAVE ${raid.wave} 클리어`, raid.wave >= RAID[raid.diff].waves ? '마지막 웨이브 클리어!' : '6초 뒤 다음 웨이브 · 경찰이 더 늘어나요', '#7bd44a'); playSound('cash'); }
+        heat = 5; if (raid.done >= raid.quota) { raid.ph = 'brk'; raid.t = 6; title(`✅ ${raid.ev ? raid.ev.name : 'WAVE ' + raid.wave} 클리어`, raid.wave >= rcf().waves ? '레이드 클리어!' : '6초 뒤 다음 웨이브 · 경찰이 더 늘어나요', '#7bd44a'); playSound('cash'); }
       } else if (raid.ph === 'brk') { heat = 5; raid.t -= dt; if (raid.t <= 0) raidNext(); }
       else if (raid.ph === 'win') { raid.t -= dt; if (raid.t <= 0) { go(LOBBY); return; } }
       raidSaveT -= dt; if (raidSaveT <= 0) { raidSaveT = 1.5; raidSave(); }
@@ -4726,7 +4796,7 @@
       const w = d.w | 0; if (w < raid.wave) return;
       if (w > raid.wave || (w === raid.wave && ((d.kl | 0) > raid.kills || (d.dn | 0) > raid.done || (PHN[d.ph] || 0) > PHN[raid.ph]))) {
         const nw = w !== raid.wave; raid.wave = w; raid.done = Math.max(nw ? 0 : raid.done, d.dn | 0); raid.kills = Math.max(nw ? 0 : raid.kills, d.kl | 0); raid.ph = PHN[d.ph] !== undefined ? d.ph : raid.ph; raid.t = +d.t || 0;
-        if (w) { raid.total = raidTotal(raid.diff, w, raid.size); raid.quota = raidSteal(w); }
+        if (w) { raid.total = raidTotal(raid.diff, w, raid.size, raid.ev); raid.quota = raidSteal(w, raid.ev); }
         if (raid.ph === 'win') { raidWin(); }
       }
     }
@@ -4739,13 +4809,13 @@
     function raidHud() {
       const r = RAID[raid.diff], x = VW / 2; ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
       ctx.fillStyle = '#ff5a5a'; ctx.font = 'bold 15px system-ui';
-      const head = raid.ph === 'intro' ? `🚔 RAID ${r.n} · ${Math.ceil(raid.t)}초 뒤 시작` : raid.ph === 'win' ? '🏆 레이드 클리어!' : `🚔 RAID ${r.n} · WAVE ${raid.wave} / ${r.waves}`;
+      const nm = raid.ev ? '🎉 ' + raid.ev.name : r.n, head = raid.ph === 'intro' ? `🚔 RAID ${nm} · ${Math.ceil(raid.t)}초 뒤 시작` : raid.ph === 'win' ? '🏆 레이드 클리어!' : raid.ev ? `🎉 ${raid.ev.name}` : `🚔 RAID ${r.n} · WAVE ${raid.wave} / ${r.waves}`;
       ctx.fillText(head, x, 30);
       if (raid.ph === 'run' || raid.ph === 'stl' || raid.ph === 'brk') {
         const w = 260, kill = raid.ph === 'run', p = kill ? (raid.total ? Math.min(1, raid.kills / raid.total) : 0) : raid.ph === 'brk' ? 1 : (raid.quota ? Math.min(1, raid.done / raid.quota) : 0);
         ctx.fillStyle = '#0009'; ctx.fillRect(x - w / 2, 52, w, 14); ctx.fillStyle = raid.ph === 'brk' ? '#4cd98a' : kill ? '#ff6a5a' : '#ffd23f'; ctx.fillRect(x - w / 2, 52, w * p, 14);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui';
-        ctx.fillText(raid.ph === 'brk' ? `웨이브 클리어! 다음까지 ${Math.ceil(raid.t)}초` : kill ? `① 경찰 소탕 ${raid.kills} / ${raid.total}  ·  ② 도둑질 ${raid.quota}번` : `① 소탕 완료  ·  ② 도둑질 ${raid.done} / ${raid.quota}`, x, 69);
+        ctx.fillText(raid.ph === 'brk' ? `웨이브 클리어! 다음까지 ${Math.ceil(raid.t)}초` : kill ? `① 경찰 소탕 ${raid.kills} / ${raid.total}` + (raid.quota ? `  ·  ② 도둑질 ${raid.quota}번` : '') : `① 소탕 완료  ·  ② 도둑질 ${raid.done} / ${raid.quota}`, x, 69);
       }
       ctx.restore();
     }
@@ -4879,7 +4949,7 @@
     refreshUI();
     setTimeout(() => { if (!raidResume()) go(myCode); }, 300);
     setInterval(() => { if (lastD && performance.now() - lastForce > 2500) { lastForce = performance.now(); send('s', lastD); } }, 2500);
-    return { tick, hud, mini, wlv, station, shot, hall: () => hall, raid: () => !!raid, raidWant, raidHeli, raidKill, raidCanRob: () => !!raid && raid.ph === 'stl', raidRob, raidBusted, abHole: (x, y) => wellAdd(x, y, 60, 1), nitro: () => nitroT > 0, has: k => !!own[k], pvpOn, pvpCone, pvpRad, pvpRay, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1) * swiftMul(), fx: fxShot, enHit, relMul, enTag, phys, pS: pSolid, jump: doJump };
+    return { tick, hud, mini, wlv, station, shot, hall: () => hall, raid: () => !!raid, raidWant, raidHeli, raidTank, raidSpeed, raidKill, raidCanRob: () => !!raid && raid.ph === 'stl', raidRob, raidBusted, abHole: (x, y) => wellAdd(x, y, 60, 1), nitro: () => nitroT > 0, has: k => !!own[k], pvpOn, pvpCone, pvpRad, pvpRay, boom: boomEv, loot, rideKey, bulletHit, martial: martialEv, busted: bustedEv, dbg: () => ({ last: lastD, st: status, host: isHost(), hostId: hostId(), me: myId, rem: [...remotes.values()].map(r => ({ id: r.id, x: r.x | 0, y: r.y | 0, z: r.z | 0, onFoot: r.onFoot, kind: r.kind, nid: r.nid, drv: !!r.drvC, rd: r.rd, inMap: nidMap.has(r.nid), isP: nidMap.get(r.nid) === P.car, inCars: cars.some(c => c.nid === r.nid) })) }), locked: () => locked, riding: () => !!ride, aimA, aimVz: (v, z0) => v * aimSl(z0), aimSl, god: () => god > 0, jv: () => jumpT > 0 ? 600 : 230, spd: () => (spdT > 0 ? 2 : 1) * (jpOn ? 1.6 : 1) * swiftMul(), fx: fxShot, enHit, relMul, enTag, phys, pS: pSolid, jump: doJump };
   })();
 
   let last = performance.now();

@@ -60,7 +60,7 @@
 <div id="app" class="hide">
   <h1>🛠 CRIME CITY 관리자</h1>
   <div class="sub">변경은 게임에 접속 중인 모든 방·모든 서버의 플레이어에게 즉시(상점·차 가게를 열어 둔 사람은 0.1초, 그 외는 2초 안에) 반영돼요.</div>
-  <div class="tabs" style="flex-wrap:wrap"><button id="t4" class="on">🟢 접속자·방</button><button id="t5">🔨 경매</button><button id="t3">👤 계정</button><button id="t1">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button></div>
+  <div class="tabs" style="flex-wrap:wrap"><button id="t4" class="on">🟢 접속자·방</button><button id="t5">🔨 경매</button><button id="t6">🚔 레이드</button><button id="t3">👤 계정</button><button id="t1">💲 가격</button><button id="t2">☢️ 원자폭탄 재고</button></div>
 
   <div id="p4">
     <div class="stat"><div><div class="lbl">접속 중</div><div class="big" id="oN">–</div></div><div><div class="lbl">열린 방</div><div class="big" id="oR">–</div></div></div>
@@ -73,6 +73,12 @@
       <div class="row" style="margin-top:8px"><input id="banName" placeholder="차단할 이름" style="width:160px"><input id="banWhy" placeholder="사유(선택)" style="flex:1"><button class="bad" id="banGo">차단</button></div></div>
   </div>
 
+  <div id="p6" class="hide">
+    <div class="card"><div class="lbl">🎁 난이도별 클리어 보상 (돈 · 폭탄 · 무기 · 저장하면 바로 적용)</div><div id="rdRew"></div></div>
+    <div class="card"><div class="lbl">🎉 이벤트 레이드 (지정한 시간에 열리고, 가장 먼저 깬 1명만 보상을 받아요)</div>
+      <div class="scroll"><table><thead><tr><th>이름</th><th>시간</th><th>상태</th><th>설정</th><th>보상</th><th>제어</th></tr></thead><tbody id="rdEvRows"></tbody></table></div></div>
+    <div class="card"><div class="lbl" id="rdFormT">➕ 새 이벤트 레이드 만들기</div><div id="rdForm"></div></div>
+  </div>
   <div id="p5" class="hide">
     <div class="card">
       <div class="row" style="margin-bottom:10px"><select id="auSt" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"><option value="open">판매 중</option><option value="sold">판매 완료</option><option value="cancelled">취소됨</option><option value="all">전체</option></select><button id="auReload">새로고침</button><span class="sub" style="margin:0" id="auInfo"></span></div>
@@ -425,10 +431,103 @@ $('aq').oninput = renderAccts; $('aReload').onclick = loadAccts;
 let curTab = 4;
 function tab(n) {
   curTab = n;
-  for (const i of [1, 2, 3, 4, 5]) { $('p' + i).classList.toggle('hide', n !== i); $('t' + i).classList.toggle('on', n === i); }
-  if (n === 3) loadAccts(); if (n === 4) { loadOnline(); loadBans(); } if (n === 5) loadAuc();
+  for (const i of [1, 2, 3, 4, 5, 6]) { $('p' + i).classList.toggle('hide', n !== i); $('t' + i).classList.toggle('on', n === i); }
+  if (n === 3) loadAccts(); if (n === 4) { loadOnline(); loadBans(); } if (n === 5) loadAuc(); if (n === 6) loadRaid();
 }
-for (const i of [1, 2, 3, 4, 5]) $('t' + i).onclick = () => tab(i);
+for (const i of [1, 2, 3, 4, 5, 6]) $('t' + i).onclick = () => tab(i);
+
+// ================= 🚔 레이드 보상 · 이벤트 레이드 =================
+let rdData = null, evF = null;
+const numIn = (v, mn, mx, w) => { const i = document.createElement('input'); i.type = 'number'; i.min = mn; i.max = mx; i.value = v; i.style.width = w || '90px'; return i; };
+const fld = (label, el) => { const d = document.createElement('div'); const l = document.createElement('div'); l.className = 'lbl'; l.textContent = label; d.append(l, el); return d; };
+const normRew = r => ({ money: Number(r && r.money) || 0, gren: Number(r && r.gren) || 0, tnt: Number(r && r.tnt) || 0, ab: Number(r && r.ab) || 0, weapons: ((r && r.weapons) || []).map(x => ({ w: Number(x.w), lv: Number(x.lv) || 0, en: x.en || null })) });
+// 보상 편집기: 돈 · 수류탄 · TNT · 원자폭탄 · 무기(강화·인첸트 포함)
+function rewEditor(rw, onCh) {
+  const box = document.createElement('div'); const ch = () => onCh && onCh(rw);
+  const g = document.createElement('div'); g.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px';
+  for (const [k, lab, mx] of [['money', '💰 돈 ($)', 2e9], ['gren', '💣 수류탄 개수', 9999], ['tnt', '🧨 TNT 개수', 9999], ['ab', '☢️ 원자폭탄 개수', 99]]) {
+    const i = numIn(rw[k], 0, mx, k === 'money' ? '140px' : '100px'); i.oninput = () => { rw[k] = Math.max(0, Math.floor(Number(i.value)) || 0); ch(); }; g.appendChild(fld(lab, i));
+  }
+  box.appendChild(g);
+  const wl = document.createElement('div'); wl.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+  const draw = () => {
+    wl.innerHTML = '';
+    rw.weapons.forEach((it, n) => {
+      const r = document.createElement('div'); r.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px';
+      const ws = document.createElement('select'); ws.style.cssText = SELI; ws.innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join(''); ws.value = it.w; ws.onchange = () => { it.w = Number(ws.value); ch(); };
+      const lv = numIn(it.lv, 0, 99, '70px'); lv.title = '강화 단계'; lv.oninput = () => { it.lv = Math.max(0, Math.min(99, Math.floor(Number(lv.value)) || 0)); ch(); };
+      const eb = document.createElement('button'); eb.type = 'button'; eb.className = 'enBtn'; const cnt = () => { eb.textContent = '🔮 인첸트 ' + enList(it.en).length; }; cnt();
+      const ed = enEditor(() => it.en, v => { it.en = v; cnt(); ch(); }); ed.style.display = 'none'; eb.onclick = () => { ed.style.display = ed.style.display === 'none' ? 'block' : 'none'; };
+      const del = document.createElement('button'); del.className = 'bad'; del.type = 'button'; del.textContent = '삭제'; del.style.marginLeft = 'auto'; del.onclick = () => { rw.weapons.splice(n, 1); draw(); ch(); };
+      const lab = document.createElement('span'); lab.textContent = '⚔️'; r.append(lab, ws, lv, eb, del, ed); wl.appendChild(r);
+    });
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'enBtn'; add.textContent = '＋ 무기 추가 (최대 10개)';
+    add.onclick = () => { if (rw.weapons.length >= 10) return toast('무기는 최대 10개예요', 0); rw.weapons.push({ w: WEAPONS[0][0], lv: 0, en: null }); draw(); ch(); }; wl.appendChild(add);
+  };
+  draw(); box.appendChild(wl); return box;
+}
+const toLocalIn = sec => { if (!sec) return ''; const d = new Date(sec * 1000); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+const fmtT = sec => sec ? new Date(sec * 1000).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '제한 없음';
+const rewText = rw => { rw = normRew(rw); const a = []; if (rw.money) a.push('$' + rw.money.toLocaleString()); if (rw.gren) a.push('💣×' + rw.gren); if (rw.tnt) a.push('🧨×' + rw.tnt); if (rw.ab) a.push('☢️×' + rw.ab); rw.weapons.forEach(x => a.push('⚔️' + wNmI(x.w) + (x.lv ? '+' + x.lv : '') + (enText(x.en) ? '(' + enText(x.en) + ')' : ''))); return a.join(' · ') || '없음'; };
+async function loadRaid() { try { rdData = await rpc('cc_admin_raid', { pw }); renderRaid(); } catch (e) { toast('레이드 정보를 못 불러왔어요: ' + e.message, 0); } }
+function newEvF() { const n = Math.floor(Date.now() / 1000); return { id: null, name: '', start: n + 600, end: n + 600 + 3600, pol: 40, cars: 8, heli: 2, tank: 0, speed: 1.1, steal: 2, enabled: true, reward: normRew({ money: 5000000 }) }; }
+function renderRaid() {
+  const R = $('rdRew'); R.innerHTML = '';
+  [['🟢 보통', 0], ['🟠 어려움', 1], ['🔴 지옥', 2]].forEach(([nm, idx]) => {
+    const cur = normRew((rdData.rewards.find(x => x.idx === idx) || {}).reward); const c = document.createElement('div'); c.style.cssText = 'padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px';
+    const h = document.createElement('div'); h.style.cssText = 'font-weight:800;margin-bottom:6px'; h.textContent = nm + ' 난이도 클리어 보상'; c.appendChild(h);
+    c.appendChild(rewEditor(cur));
+    const b = document.createElement('button'); b.className = 'pri'; b.textContent = '💾 저장'; b.style.marginTop = '8px';
+    b.onclick = async () => { try { await rpc('cc_admin_raid_reward', { pw, p_idx: idx, p_reward: cur }); toast(nm + ' 보상 저장 완료 · 지금부터 바로 적용돼요', 1); } catch (e) { toast('실패: ' + e.message, 0); } };
+    c.appendChild(b); R.appendChild(c);
+  });
+  const rows = $('rdEvRows'); rows.innerHTML = ''; const now = rdData.now;
+  if (!rdData.events.length) rows.innerHTML = '<tr><td colspan="6" class="lbl">아직 이벤트가 없어요</td></tr>';
+  rdData.events.forEach(ev => {
+    const st = !ev.enabled ? '⏸ 꺼짐' : ev.winner ? '🏆 우승 ' + ev.winner : now < ev.start ? '⏳ 대기 (' + fmtT(ev.start) + ' 오픈)' : (ev.end && now > ev.end) ? '⌛ 종료' : '🟢 진행 중';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><b></b></td><td>${fmtT(ev.start)}<br>~ ${fmtT(ev.end)}</td><td>${st}</td><td>경찰 ${ev.pol}명<br>차 ${ev.cars} · 헬기 ${ev.heli} · 탱크 ${ev.tank}<br>속도 ×${ev.speed} · 훔치기 ${ev.steal}번</td><td></td><td></td>`;
+    tr.querySelector('b').textContent = ev.name; tr.children[4].textContent = rewText(ev.reward);
+    const td = tr.children[5];
+    const mk = (t, f, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = f; td.append(b, ' '); };
+    mk('✏️ 편집', () => { evF = { id: ev.id, name: ev.name, start: ev.start, end: ev.end, pol: ev.pol, cars: ev.cars, heli: ev.heli, tank: ev.tank, speed: Number(ev.speed), steal: ev.steal, enabled: ev.enabled, reward: normRew(ev.reward) }; renderEvForm(); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); });
+    if (ev.winner) mk('🔄 우승 초기화', async () => { try { await rpc('cc_admin_event_reset', { pw, p_id: ev.id }); toast('우승자를 지웠어요 · 다시 선착순을 받아요', 1); loadRaid(); } catch (e) { toast('실패: ' + e.message, 0); } });
+    mk('🗑 삭제', async () => { if (!confirm('이벤트 "' + ev.name + '"를 삭제할까요?')) return; try { await rpc('cc_admin_event_delete', { pw, p_id: ev.id }); toast('삭제했어요', 1); loadRaid(); } catch (e) { toast('실패: ' + e.message, 0); } }, 'bad');
+    rows.appendChild(tr);
+  });
+  if (!evF) evF = newEvF(); renderEvForm();
+}
+function renderEvForm() {
+  const f = evF, F = $('rdForm'); F.innerHTML = ''; $('rdFormT').textContent = f.id ? '✏️ 이벤트 수정 · #' + f.id : '➕ 새 이벤트 레이드 만들기';
+  const g = document.createElement('div'); g.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px';
+  const nm = document.createElement('input'); nm.maxLength = 30; nm.placeholder = '이벤트 이름 (원하는 대로)'; nm.value = f.name; nm.style.width = '240px'; nm.oninput = () => { f.name = nm.value; };
+  const st = document.createElement('input'); st.type = 'datetime-local'; st.value = toLocalIn(f.start); st.onchange = () => { f.start = st.value ? Date.parse(st.value) / 1000 : null; };
+  const en = document.createElement('input'); en.type = 'datetime-local'; en.value = toLocalIn(f.end); en.onchange = () => { f.end = en.value ? Date.parse(en.value) / 1000 : null; };
+  g.append(fld('① 이벤트 이름', nm), fld('② 오픈 시각 (이때부터 입장 가능)', st), fld('③ 종료 시각 (비우면 계속)', en));
+  const q = document.createElement('div'); q.style.cssText = 'display:flex;gap:6px;align-items:end;flex-wrap:wrap';
+  const qb = (t, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'enBtn'; b.textContent = t; b.onclick = () => { fn(); renderEvForm(); }; q.appendChild(b); };
+  qb('지금 바로 열기', () => { const n = Math.floor(Date.now() / 1000); f.start = n; if (!f.end || f.end <= n) f.end = n + 3600; });
+  qb('종료 = 오픈+30분', () => { f.end = f.start + 1800; }); qb('+1시간', () => { f.end = f.start + 3600; }); qb('+3시간', () => { f.end = f.start + 10800; }); qb('+24시간', () => { f.end = f.start + 86400; });
+  g.appendChild(fld('빠른 설정', q));
+  F.appendChild(g);
+  const g2 = document.createElement('div'); g2.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px';
+  for (const [k, lab, mn, mx, step] of [['pol', '④ 경찰 수 (잡아야 할 수)', 1, 300, 1], ['cars', '⑤ 동시 경찰차 수', 1, 30, 1], ['heli', '⑥ 동시 헬기 수', 0, 15, 1], ['tank', '⑦ 동시 탱크 수', 0, 10, 1], ['speed', '⑧ 경찰 속도 배율 (1=기본)', 0.5, 2.5, 0.1], ['steal', '⑨ 훔칠 횟수 (0=소탕만)', 0, 20, 1]]) {
+    const i = numIn(f[k], mn, mx, '110px'); i.step = step; i.oninput = () => { f[k] = Number(i.value); }; g2.appendChild(fld(lab, i));
+  }
+  const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = f.enabled; ck.onchange = () => { f.enabled = ck.checked; }; g2.appendChild(fld('⑩ 사용', ck));
+  F.appendChild(g2);
+  const rl = document.createElement('div'); rl.className = 'lbl'; rl.textContent = '⑪ 선착순 1등 보상 (돈 · 폭탄 · 무기)'; F.appendChild(rl); F.appendChild(rewEditor(f.reward));
+  const row = document.createElement('div'); row.className = 'row'; row.style.marginTop = '10px';
+  const sv = document.createElement('button'); sv.className = 'pri'; sv.textContent = f.id ? '💾 수정 저장' : '🚀 이벤트 만들기';
+  sv.onclick = async () => {
+    try {
+      await rpc('cc_admin_event_save', { pw, p_id: f.id, p_name: f.name, p_start: new Date(f.start * 1000).toISOString(), p_end: f.end ? new Date(f.end * 1000).toISOString() : null, p_pol: Math.floor(f.pol), p_cars: Math.floor(f.cars), p_heli: Math.floor(f.heli), p_tank: Math.floor(f.tank), p_speed: f.speed, p_steal: Math.floor(f.steal), p_reward: f.reward, p_enabled: f.enabled });
+      toast(f.id ? '이벤트를 수정했어요' : '이벤트를 만들었어요 · 오픈 시각이 되면 로비(LLLLL)에 떠요', 1); evF = newEvF(); loadRaid();
+    } catch (e) { toast('실패: ' + e.message, 0); }
+  };
+  const nw = document.createElement('button'); nw.textContent = '새로 쓰기'; nw.onclick = () => { evF = newEvF(); renderEvForm(); };
+  row.append(sv, nw); F.appendChild(row);
+}
 
 // ---- 접속자 · 방 (2초마다 갱신)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
