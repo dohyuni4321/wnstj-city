@@ -3755,8 +3755,8 @@
       const left = k === 'god' ? god : k === 'spd' ? spdT : jumpT;
       saveOwn(); playSound('cash'); ivNote = `${POT[k].ic} ${POT[k].n} 마심 · 남은 시간 ${Math.ceil(left)}초`; msg(ivNote); if (k === 'god') event('님이 무적 포션을 마셨습니다'); renderInv();
     }
-    // 인첸트 저장 형태: [종류,레벨] (일반) 또는 [[종류,레벨],[종류,레벨],...] (관리자 경매 · 최대 4개 · 같은 인첸트 중복도 가능)
-    const enNorm = x => { if (!Array.isArray(x)) return []; const a = typeof x[0] === 'number' ? [x] : x; return a.filter(p => Array.isArray(p) && ENCH[p[0] | 0]).slice(0, 4).map(p => [p[0] | 0, Math.max(1, Math.min(3, p[1] | 0))]); };
+    // 인첸트 저장 형태: [종류,레벨] (일반) 또는 [[종류,레벨],[종류,레벨],...] (관리자 경매 · 최대 10개 · 같은 인첸트 중복도 가능)
+    const enNorm = x => { if (!Array.isArray(x)) return []; const a = typeof x[0] === 'number' ? [x] : x; return a.filter(p => Array.isArray(p) && ENCH[p[0] | 0]).slice(0, 10).map(p => [p[0] | 0, Math.max(1, Math.min(3, p[1] | 0))]); };
     const enStr = x => enNorm(x).map(p => `${ENCH[p[0]].ic}${esc(ENCH[p[0]].n)} Lv${p[1]}`).join(' + ');
     function invClean() {
       if (!Array.isArray(own.inv)) { if (own.inv !== undefined) delete own.inv; return; }

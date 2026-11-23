@@ -39,6 +39,13 @@
   tr.pick{cursor:pointer} tr.pick:hover td{background:rgba(255,210,63,.07)} tr.sel td{background:rgba(255,210,63,.16)}
   button.bad{border-color:var(--bad);color:var(--bad)}
   @media (max-width:560px){td input{width:110px}}
+  .enEd{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#0e121a;margin:4px 0;flex:1 0 100%}
+  .enEd .tgs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;min-height:24px;align-items:center}
+  .enEd .tg{display:inline-flex;align-items:center;gap:5px;padding:2px 4px 2px 9px;border-radius:999px;background:#1a2030;border:1px solid var(--line);font-size:12px}
+  .enEd .tg button{padding:0 6px;line-height:18px;border-radius:50%;background:transparent;border:0;color:var(--mut);cursor:pointer}
+  .enEd .tg button:hover{color:var(--bad)} .enEd .ad{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .enEd select{background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:5px 6px;color:var(--tx)} .enEd .cnt{margin-left:auto;font-size:11px;color:var(--mut)}
+  .enBtn{padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#1a2030;color:var(--tx);cursor:pointer;font-size:12px}
 </style>
 </head>
 <body>
@@ -77,7 +84,7 @@
         <div id="nkWb" class="row" style="gap:12px;align-items:flex-end">
           <div><div class="lbl">② 무기 이름</div><select id="nkW" style="background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px"></select></div>
           <div><div class="lbl">③ 강화 단계 (1~99)</div><input id="nkLv" type="number" min="1" max="99" value="10" style="width:110px" title="무기 강화 단계"></div>
-          <div><div class="lbl">④ 인첸트 (최대 4개 · 같은 인첸트 중복 가능)</div><div id="nkEnBox" style="display:flex;flex-direction:column;gap:4px"></div></div>
+          <div><div class="lbl">④ 인첸트 (최대 10개 · 같은 인첸트 중복 가능)</div><div id="nkEnBox" style="display:flex;flex-direction:column;gap:4px"></div></div>
         </div>
         <div id="nkQb"><div class="lbl">② 수량 (개) — 한 묶음으로 팔 개수</div><input id="nkQ" type="number" min="1" value="10" style="width:150px" title="묶음 수량"></div>
         <div><div class="lbl">가격 ($) — 이 물품 전체(묶음)의 총 가격</div><input id="nkP" type="number" min="0" placeholder="예: 5000000" style="width:190px"></div>
@@ -157,7 +164,7 @@
       </div>
       <div class="lbl" style="margin-top:12px">🎒 인벤토리 (보관 중인 무기 · 최대 80칸) <span id="aInvN"></span></div>
       <div id="aInv" style="display:flex;flex-direction:column;gap:6px"></div>
-      <div class="lbl" style="margin-top:8px">➕ 인벤토리에 무기 넣기 (무기 / 강화 / 인첸트 최대 4개 · 같은 인첸트 중복 가능)</div>
+      <div class="lbl" style="margin-top:8px">➕ 인벤토리에 무기 넣기 (무기 / 강화 / 인첸트 최대 10개 · 같은 인첸트 중복 가능)</div>
       <div id="aInvAdd" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"></div>
       <div class="lbl" style="margin-top:12px">전체 데이터(JSON) — 위에 없는 값(웨이포인트 등)도 여기서 직접 고칠 수 있어요</div>
       <textarea id="aJson" rows="6" spellcheck="false"></textarea>
@@ -305,20 +312,16 @@ function renderEd() {
   for (const [idx, nm] of WEAPONS) {
     const sel = document.createElement('select'); for (let i = 0; i <= 99; i++) { const o = document.createElement('option'); o.value = i; o.textContent = '+' + i; sel.appendChild(o); }
     sel.value = Number(aOwn.wu[idx]) || 0;
-    const cur = enList(aOwn.en[idx]), pairs = [];
-    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;align-items:center'; ex.append(sel);
-    for (let k = 0; k < 4; k++) {   // 인첸트 4칸 · 안 붙은 칸은 '없음'
-      const es = document.createElement('select'); es.title = '인첸트 ' + (k + 1) + ' 종류'; es.innerHTML = `<option value="-1">인첸트${k + 1} · 없음</option>` + ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
-      const el = document.createElement('select'); el.title = '인첸트 ' + (k + 1) + ' 레벨'; el.innerHTML = '<option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option>';
-      if (cur[k]) { es.value = cur[k][0]; el.value = cur[k][1]; } else es.value = -1;
-      pairs.push([es, el]); const w = document.createElement('span'); w.style.cssText = 'display:flex;gap:2px'; w.append(es, el); ex.append(w);
-    }
+    const ex = document.createElement('span'); ex.style.cssText = 'display:flex;gap:4px;align-items:center'; ex.append(sel);
+    const eb = document.createElement('button'); eb.type = 'button'; eb.className = 'enBtn'; ex.append(eb);
     const [l, cb] = chip(aOwn[idx], nm, ex);
-    const setEn = () => { const L = []; pairs.forEach(([es, el]) => { const t = Number(es.value); if (t >= 0) L.push([t, Number(el.value) || 1]); }); if (L.length) { aOwn[idx] = 1; aOwn.en[idx] = L.length === 1 ? L[0] : L; cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; syncJson(); };
-    pairs.forEach(([es, el]) => { es.onchange = setEn; el.onchange = setEn; });
-    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; pairs.forEach(([es]) => { es.value = -1; }); } l.classList.toggle('on', cb.checked); syncJson(); };
+    const cnt = () => { eb.textContent = '🔮 인첸트 ' + enList(aOwn.en[idx]).length; };
+    const ed = enEditor(() => aOwn.en[idx], v => { if (v) { aOwn[idx] = 1; aOwn.en[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.en[idx]; cnt(); syncJson(); });
+    ed.style.display = 'none'; cnt();
+    eb.onclick = e => { e.preventDefault(); e.stopPropagation(); ed.style.display = ed.style.display === 'none' ? 'block' : 'none'; };
+    cb.onchange = () => { if (cb.checked) aOwn[idx] = 1; else { delete aOwn[idx]; delete aOwn.wu[idx]; delete aOwn.en[idx]; sel.value = 0; ed.render(); cnt(); } l.classList.toggle('on', cb.checked); syncJson(); };
     sel.onchange = () => { const v = Number(sel.value) || 0; if (v > 0) { aOwn[idx] = 1; aOwn.wu[idx] = v; cb.checked = true; l.classList.add('on'); } else delete aOwn.wu[idx]; syncJson(); };
-    W.appendChild(l);
+    W.appendChild(l); W.appendChild(ed);
   }
   for (const c of CATALOG.filter(x => x[0] === 'car')) {
     const [l, cb] = chip(aOwn.cars[c[1]], c[2]);
@@ -331,6 +334,29 @@ function renderEd() {
     P.appendChild(l);
   }
   $('aAb').value = Number(aOwn.ab) || 0; $('aJpu').value = Number(aOwn.jpu) || 0; renderInvEd(); syncJson();
+}
+const EN_MAX = 10;
+// 인첸트 편집기: 붙은 인첸트는 작은 태그로 보이고(✕로 제거), 아래 한 줄에서 종류·레벨을 골라 추가 (최대 10개 · 같은 인첸트 중복 가능)
+function enEditor(get, set) {
+  const box = document.createElement('div'); box.className = 'enEd';
+  const commit = L => { set(L.length ? (L.length === 1 ? L[0] : L) : null); render(); };
+  function render() {
+    const L = enList(get()).map(p => [p[0], p[1]]); box.innerHTML = '';
+    const tgs = document.createElement('div'); tgs.className = 'tgs';
+    if (!L.length) { const e = document.createElement('span'); e.className = 'lbl'; e.textContent = '인첸트 없음'; tgs.appendChild(e); }
+    L.forEach((p, k) => { const t = document.createElement('span'); t.className = 'tg'; t.append(ENCHN[p[0]] + ' Lv' + p[1]); const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.title = '제거'; x.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); L.splice(k, 1); commit(L); }; t.appendChild(x); tgs.appendChild(t); });
+    box.appendChild(tgs);
+    const ad = document.createElement('div'); ad.className = 'ad';
+    if (L.length < EN_MAX) {
+      const es = document.createElement('select'); es.innerHTML = ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+      const el = document.createElement('select'); el.innerHTML = '<option value="1">Lv1</option><option value="2">Lv2</option><option value="3" selected>Lv3</option>';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'enBtn'; b.textContent = '＋ 추가'; b.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); L.push([Number(es.value), Number(el.value)]); commit(L); };
+      ad.append(es, el, b);
+    } else { const m = document.createElement('span'); m.className = 'lbl'; m.textContent = '최대 ' + EN_MAX + '개까지 붙일 수 있어요'; ad.appendChild(m); }
+    const c = document.createElement('span'); c.className = 'cnt'; c.textContent = L.length + ' / ' + EN_MAX; ad.appendChild(c); box.appendChild(ad);
+    for (const ev of ['click', 'change', 'input']) box.addEventListener(ev, e => e.stopPropagation(), { once: false });
+  }
+  render(); box.render = render; return box;
 }
 const enList = x => Array.isArray(x) ? (typeof x[0] === 'number' ? [x] : x).filter(p => Array.isArray(p) && ENCHN[p[0]]) : [];
 const enText = x => enList(x).map(p => ENCHN[p[0]] + ' Lv' + p[1]).join(' + ');
@@ -345,29 +371,24 @@ function renderInvEd() {
     const ws = document.createElement('select'); ws.style.cssText = SELI; ws.innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('');
     if (!WEAPONS.some(w => w[0] === it.w)) ws.insertAdjacentHTML('afterbegin', `<option value="${it.w}">무기 #${it.w}</option>`); ws.value = it.w;
     const lv = document.createElement('input'); lv.type = 'number'; lv.min = 0; lv.max = 99; lv.value = it.lv | 0; lv.title = '강화 단계 (0~99)'; lv.style.width = '70px';
-    r.append(ws, lv);
-    const cur = enList(it.en), sels = [];
-    for (let k = 0; k < 4; k++) {
-      const es = document.createElement('select'); es.style.cssText = SELI; es.innerHTML = `<option value="-1">인첸트${k + 1} · 없음</option>` + ENCHN.map((nm, x) => `<option value="${x}">${nm}</option>`).join('');
-      const el = document.createElement('select'); el.style.cssText = SELI; el.innerHTML = '<option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option>';
-      if (cur[k]) { es.value = cur[k][0]; el.value = cur[k][1]; } sels.push([es, el]);
-      const w = document.createElement('span'); w.style.cssText = 'display:flex;gap:3px'; w.append(es, el); r.appendChild(w);
-    }
-    const apply = () => { const L = []; sels.forEach(([es, el]) => { const t = Number(es.value); if (t >= 0) L.push([t, Number(el.value)]); }); it.w = Number(ws.value); it.lv = Math.max(0, Math.min(99, Math.floor(Number(lv.value)) || 0)); it.en = L.length ? (L.length === 1 ? L[0] : L) : null; syncJson(); };
-    r.addEventListener('change', apply); r.addEventListener('input', apply);
+    const eb = document.createElement('button'); eb.type = 'button'; eb.className = 'enBtn'; const cnt = () => { eb.textContent = '🔮 인첸트 ' + enList(it.en).length; }; cnt();
+    const ed = enEditor(() => it.en, v => { it.en = v; cnt(); syncJson(); }); ed.style.display = 'none';
+    eb.onclick = () => { ed.style.display = ed.style.display === 'none' ? 'block' : 'none'; };
+    const apply = () => { it.w = Number(ws.value); it.lv = Math.max(0, Math.min(99, Math.floor(Number(lv.value)) || 0)); syncJson(); };
+    ws.onchange = apply; lv.oninput = apply;
     const b = document.createElement('button'); b.className = 'bad'; b.textContent = '삭제'; b.style.marginLeft = 'auto'; b.onclick = () => { aOwn.inv.splice(n, 1); renderInvEd(); syncJson(); };
-    r.appendChild(b); box.appendChild(r);
+    r.append(ws, lv, eb, b, ed); box.appendChild(r);
   });
   const add = $('aInvAdd'); if (add.dataset.ready) return; add.dataset.ready = 1;
-  add.innerHTML = `<select id="iaW" style="${SELI}">${WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select><input id="iaLv" type="number" min="0" max="99" value="1" title="강화 단계 (0~99)" style="width:70px">`
-    + [1, 2, 3, 4].map(k => `<span style="display:flex;gap:3px"><select class="iaEn" style="${SELI}"><option value="-1">인첸트${k} · 없음</option>${ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select><select class="iaEl" style="${SELI}"><option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option></select></span>`).join('')
-    + '<button id="iaGo" class="pri">인벤토리에 추가</button>';
+  let iaEn = null;
+  const head = document.createElement('div'); head.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%';
+  head.innerHTML = `<select id="iaW" style="${SELI}">${WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select><input id="iaLv" type="number" min="0" max="99" value="1" title="강화 단계 (0~99)" style="width:70px"><button id="iaGo" class="pri">인벤토리에 추가</button>`;
+  const ed = enEditor(() => iaEn, v => { iaEn = v; });
+  add.append(head, ed);
   $('iaGo').onclick = () => {
     if (aOwn.inv.length >= 80) return toast('인벤토리가 가득 찼어요 (80칸)', 0);
-    const ens = [...document.querySelectorAll('.iaEn')], els = [...document.querySelectorAll('.iaEl')], L = [];
-    ens.forEach((e, k) => { const t = Number(e.value); if (t >= 0) L.push([t, Number(els[k].value)]); });
-    aOwn.inv.push({ w: Number($('iaW').value), lv: Math.max(0, Math.min(99, Math.floor(Number($('iaLv').value)) || 0)), en: L.length ? (L.length === 1 ? L[0] : L) : null });
-    renderInvEd(); syncJson();
+    aOwn.inv.push({ w: Number($('iaW').value), lv: Math.max(0, Math.min(99, Math.floor(Number($('iaLv').value)) || 0)), en: iaEn });
+    iaEn = null; ed.render(); renderInvEd(); syncJson();
   };
 }
 document.addEventListener('input', e => { const el = e.target; if (el.classList && el.classList.contains('aPot')) { const n = Math.max(0, Math.floor(Number(el.value) || 0)); if (n > 0) aOwn.pot[el.dataset.k] = n; else delete aOwn.pot[el.dataset.k]; syncJson(); } });
@@ -495,15 +516,12 @@ async function aucRemove(a, mode) {
 $('auSt').onchange = loadAuc; $('auReload').onclick = loadAuc;
 setInterval(() => { if (pw && curTab === 5 && !document.hidden && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#auRows'))) loadAuc(); }, 3000);
 $('nkW').innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('');
-const SELST = 'background:#0b0e14;border:1px solid var(--line);border-radius:8px;padding:8px';
-$('nkEnBox').innerHTML = [1, 2, 3, 4].map(k => `<div style="display:flex;gap:6px"><select class="nkEn" style="${SELST}"><option value="-1">인첸트 ${k} · 없음</option>${ENCHN.map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select><select class="nkEl" style="${SELST}"><option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option></select></div>`).join('');
+let nkEn = null; $('nkEnBox').appendChild(enEditor(() => nkEn, v => { nkEn = v; }));
 const nkSync = () => { const w = $('nkKind').value === 'weapon'; $('nkWb').classList.toggle('hide', !w); $('nkQb').classList.toggle('hide', w); };
 $('nkKind').onchange = nkSync; nkSync();
 $('nkGo').onclick = async () => {
   const kind = $('nkKind').value, price = Math.floor(Number($('nkP').value)); if (!(price >= 0)) return toast('가격을 입력하세요', 0);
-  const els = [...document.querySelectorAll('.nkEn')], lvs = [...document.querySelectorAll('.nkEl')], list = [];
-  els.forEach((el, k) => { const t = Number(el.value); if (t >= 0) list.push([t, Number(lvs[k].value)]); });
-  const ench = kind === 'weapon' && list.length ? (list.length === 1 ? list[0] : list) : null;
+  const ench = kind === 'weapon' ? nkEn : null;
   try { const id = await rpc('cc_admin_auction_add', { pw, p_kind: kind, p_weapon: kind === 'weapon' ? Number($('nkW').value) : null, p_lv: kind === 'weapon' ? Math.max(1, Math.min(99, Math.floor(Number($('nkLv').value)) || 1)) : 0, p_ench: ench, p_qty: kind === 'weapon' ? 1 : Math.max(1, Math.floor(Number($('nkQ').value)) || 1), p_price: price }); toast('경매에 올렸어요 (#' + id + ')', 1); loadAuc(); }
   catch (e) { toast('실패: ' + e.message, 0); }
 };
