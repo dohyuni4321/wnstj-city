@@ -337,10 +337,22 @@ function renderInvEd() {
   const box = $('aInv'); box.innerHTML = ''; $('aInvN').textContent = '· ' + aOwn.inv.length + ' / 80';
   if (!aOwn.inv.length) { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = '비어 있어요'; box.appendChild(d); }
   aOwn.inv.forEach((it, n) => {
-    const r = document.createElement('div'); r.style.cssText = 'display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px';
-    const t = document.createElement('span'); t.style.flex = '1'; t.textContent = wNmI(it.w) + ' +' + (it.lv | 0) + (enText(it.en) ? ' · ' + enText(it.en) : '');
-    const b = document.createElement('button'); b.className = 'bad'; b.textContent = '삭제'; b.onclick = () => { aOwn.inv.splice(n, 1); renderInvEd(); syncJson(); };
-    r.append(t, b); box.appendChild(r);
+    const r = document.createElement('div'); r.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px';
+    const ws = document.createElement('select'); ws.style.cssText = SELI; ws.innerHTML = WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('');
+    if (!WEAPONS.some(w => w[0] === it.w)) ws.insertAdjacentHTML('afterbegin', `<option value="${it.w}">무기 #${it.w}</option>`); ws.value = it.w;
+    const lv = document.createElement('input'); lv.type = 'number'; lv.min = 0; lv.max = 99; lv.value = it.lv | 0; lv.title = '강화 단계 (0~99)'; lv.style.width = '70px';
+    r.append(ws, lv);
+    const cur = enList(it.en), sels = [];
+    for (let k = 0; k < 4; k++) {
+      const es = document.createElement('select'); es.style.cssText = SELI; es.innerHTML = `<option value="-1">인첸트${k + 1} · 없음</option>` + ENCHN.map((nm, x) => `<option value="${x}">${nm}</option>`).join('');
+      const el = document.createElement('select'); el.style.cssText = SELI; el.innerHTML = '<option value="1">Lv1</option><option value="2">Lv2</option><option value="3">Lv3</option>';
+      if (cur[k]) { es.value = cur[k][0]; el.value = cur[k][1]; } sels.push([es, el]);
+      const w = document.createElement('span'); w.style.cssText = 'display:flex;gap:3px'; w.append(es, el); r.appendChild(w);
+    }
+    const apply = () => { const L = []; sels.forEach(([es, el]) => { const t = Number(es.value); if (t >= 0) L.push([t, Number(el.value)]); }); it.w = Number(ws.value); it.lv = Math.max(0, Math.min(99, Math.floor(Number(lv.value)) || 0)); it.en = L.length ? (L.length === 1 ? L[0] : L) : null; syncJson(); };
+    r.addEventListener('change', apply); r.addEventListener('input', apply);
+    const b = document.createElement('button'); b.className = 'bad'; b.textContent = '삭제'; b.style.marginLeft = 'auto'; b.onclick = () => { aOwn.inv.splice(n, 1); renderInvEd(); syncJson(); };
+    r.appendChild(b); box.appendChild(r);
   });
   const add = $('aInvAdd'); if (add.dataset.ready) return; add.dataset.ready = 1;
   add.innerHTML = `<select id="iaW" style="${SELI}">${WEAPONS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select><input id="iaLv" type="number" min="0" max="99" value="1" title="강화 단계 (0~99)" style="width:70px">`
